@@ -308,6 +308,21 @@ describe('a pasted link', () => {
  * is not built, so claiming the map holds it would be claiming something false.
  */
 describe('what the contributor already saved', () => {
+  it('keeps the saved line when an explicit locate link is reopened', async () => {
+    window.history.replaceState(null, '', `/c/${COURSE_ID}/hole/1/locate`);
+    stubNetwork([{
+      course_id: COURSE_ID, hole_number: 1, par: 4,
+      playing_line: { type: 'LineString', coordinates: [[-121.95, 36.568], [-121.947, 36.57]] },
+      line_source: 'drawn', osm_hole_id: null, features: [], reviewed_steps: ['green'],
+    }]);
+    render(<App />);
+    await settle();
+    await settle();
+    expect(screen.getByRole('button', { name: 'Yes, that is the hole' }).hasAttribute('disabled')).toBe(false);
+    expect(document.body.textContent).toContain('You saved this hole before');
+  });
+
+
   it('shows a saved hole from the store as saved and not uploaded', async () => {
     stubNetwork([
       {

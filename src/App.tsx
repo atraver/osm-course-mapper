@@ -190,7 +190,7 @@ export default function App() {
            * forcing `ready` over that is what left the screen with nothing to
            * do. Only a mode the address names explicitly overrides it.
            */
-          if (route.mode !== 'ready') actions.go('review', route.mode);
+          if (route.mode !== 'ready') actions.patch({ mode: route.mode });
           return;
         }
         case 'complete':
