@@ -13,6 +13,8 @@ import App from './App';
 import { SEARCH_DEBOUNCE_MS } from './screens/SearchScreen';
 import { clearOsmCache } from './api/overpass';
 
+vi.mock('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url', () => ({ default: '/test-worker.js' }));
+
 vi.mock('maplibre-gl', () => {
   class FakeMap {
     on() { return this; }
@@ -32,7 +34,7 @@ vi.mock('maplibre-gl', () => {
     project() { return { x: 0, y: 0 }; }
     unproject() { return { lng: 0, lat: 0 }; }
   }
-  return { default: { Map: FakeMap }, Map: FakeMap };
+  return { setWorkerUrl: vi.fn(), default: { Map: FakeMap }, Map: FakeMap };
 });
 
 const COURSE_ID = 'course-1';

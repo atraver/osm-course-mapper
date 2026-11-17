@@ -157,13 +157,15 @@ export function BaseMap({
 
     void (async () => {
       try {
-        /* The one import that must stay lazy, alongside the stylesheet that
-         * positions MapLibre's canvas inside the container. */
-        const [maplibre] = await Promise.all([
+        /* Load only in the browser. Explicitly bundle the worker with Vite;
+         * the main module's relative URL does not survive a production build. */
+        const [maplibre, { default: workerURL }] = await Promise.all([
           import('maplibre-gl'),
+          import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'),
           import('maplibre-gl/dist/maplibre-gl.css'),
         ]);
         if (cancelled) return;
+        maplibre.setWorkerUrl(workerURL);
 
         const map = new maplibre.Map({
           container,

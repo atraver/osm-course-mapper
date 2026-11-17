@@ -71,6 +71,8 @@ const harness = vi.hoisted(() => {
   };
 });
 
+vi.mock('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url', () => ({ default: '/test-worker.js' }));
+
 vi.mock('maplibre-gl', () => {
   type Handler = (event: unknown) => void;
   /* `on(type, fn)` and `on(type, layerId, fn)`, both as MapLibre takes them. */
@@ -174,7 +176,7 @@ vi.mock('maplibre-gl', () => {
       return { x: position[0] * 1000, y: position[1] * 1000 };
     }
   }
-  return { Map: FakeMap };
+  return { setWorkerUrl: vi.fn(), Map: FakeMap };
 });
 
 /**

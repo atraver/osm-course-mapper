@@ -49,6 +49,8 @@ const harness = vi.hoisted(() => {
   };
 });
 
+vi.mock('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url', () => ({ default: '/test-worker.js' }));
+
 vi.mock('maplibre-gl', () => {
   class FakeMap {
     constructor(options: FakeMapOptions) {
@@ -109,7 +111,7 @@ vi.mock('maplibre-gl', () => {
       return { lng: point.x / 1000, lat: point.y / 1000 };
     }
   }
-  return { Map: FakeMap };
+  return { setWorkerUrl: vi.fn(), Map: FakeMap };
 });
 
 import { BaseMap, IMAGERY_UNAVAILABLE_MESSAGE } from './BaseMap';
