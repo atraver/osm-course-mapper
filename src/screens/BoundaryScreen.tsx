@@ -31,6 +31,7 @@ interface BoundaryScreenProps {
   /** The name the contributor searched for, which may differ from the OSM name. */
   courseName: string;
   sourceId?: ImagerySourceId;
+  snapshotDate?: string;
   onChange: (geometry: Polygon | MultiPolygon) => void;
   onReset: () => void;
   onSave: () => void;
@@ -95,6 +96,7 @@ export function BoundaryScreen({
   save,
   courseName,
   sourceId,
+  snapshotDate,
   onChange,
   onReset,
   onSave,
@@ -172,7 +174,8 @@ export function BoundaryScreen({
           bounds={course.bbox}
           sourceId={sourceId}
           label={courseName}
-          note={editing ? 'reshaping the edge' : edited ? 'your corrected edge' : 'the line OpenStreetMap already holds'}
+          note={editing ? 'reshaping the edge' : edited ? 'your corrected edge'
+            : snapshotDate ? `OpenStreetMap snapshot: ${snapshotDate}` : 'the line OpenStreetMap already holds'}
           onMapReady={handleMapReady}
         >
           <div

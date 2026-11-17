@@ -107,7 +107,7 @@ export function BaseMap({
   center,
   zoom = 15,
   sourceId = DEFAULT_IMAGERY_SOURCE_ID,
-  dataAttribution = OSM_ODBL_ATTRIBUTION,
+  dataAttribution,
   label,
   note,
   onMapClick,
@@ -119,6 +119,9 @@ export function BaseMap({
   children,
 }: BaseMapProps) {
   const source = imagerySource(sourceId);
+  const courseCredit = dataAttribution ?? (sourceId === 'gsi-seamlessphoto'
+    ? '© OpenStreetMap contributors (ODbL 1.0): openstreetmap.org/copyright'
+    : OSM_ODBL_ATTRIBUTION);
   const isBrowser = typeof window !== 'undefined';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -401,7 +404,7 @@ export function BaseMap({
         <div>
           {source.attribution} · {source.captureContext}
         </div>
-        <div style={{ opacity: 0.82 }}>{dataAttribution}</div>
+        <div style={{ opacity: 0.82 }}>{courseCredit}</div>
       </div>
     </div>
   );

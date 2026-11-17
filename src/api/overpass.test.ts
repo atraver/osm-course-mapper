@@ -685,6 +685,30 @@ describe('tolerating an unreliable endpoint', () => {
 
     expect(lookup.status).toBe('found');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(new URL(url).searchParams.get('data')).toContain('out geom');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  it('can use a dated local snapshot after both live attempts fail', async () => {
+    vi.stubEnv('VITE_OSM_SNAPSHOTS', 'true');
+    try {
+      const response = { ...overpassBody([pebbleRelation()]), osm3s: { timestamp_osm_base: '2026-11-17T10:00:00Z' } };
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(overpassResponse(null, 502))
+        .mockResolvedValueOnce(overpassResponse(null, 502))
+        .mockResolvedValueOnce(overpassResponse(response));
+      vi.stubGlobal('fetch', fetchMock);
+      const pending = lookupOsmCourse({
+        ...PEBBLE, id: 'local:exact-boundary', osmCourseId: 'relation/3741806',
+      });
+      await vi.advanceTimersByTimeAsync(OVERPASS_RETRY_BACKOFF_MS);
+      expect(await pending).toMatchObject({ status: 'found', snapshotDate: '2026-11-17' });
+      expect(fetchMock.mock.calls[2][0]).toBe('/osm-snapshots/exact-boundary.json');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('retries an empty reply, which Overpass sends as often as it sends a 504', async () => {

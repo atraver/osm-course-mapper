@@ -922,7 +922,9 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
           sourceId={courseImagery(course?.country)}
           center={course ? [course.longitude, course.latitude] : undefined}
           label={osmHoleRef ? `Hole ${holeNum} · ${osmHoleRef}` : `Hole ${holeNum}`}
-          note={`${measurement} · ${teeSetName} says ${cardText}`}
+          note={state.osm.status === 'found' && state.osm.snapshotDate
+            ? `OpenStreetMap snapshot: ${state.osm.snapshotDate} · ${measurement}`
+            : `${measurement} · ${teeSetName} says ${cardText}`}
           onMapReady={handleMapReady}
           onMapClick={handleMapClick}
           onImageryStatusChange={setImagery}

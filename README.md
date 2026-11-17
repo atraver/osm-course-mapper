@@ -178,3 +178,10 @@ duplicates, align imagery against local reference points, and copy only
 reviewed features. For manual tracing from the GSI layer, record
 `source=GSImaps/seamlessphoto` where appropriate. The draft layer blocks upload
 and download: it never modifies existing objects or writes to OpenStreetMap.
+
+For a local course with a verified boundary ID, set `VITE_OSM_SNAPSHOTS=true`
+and serve a saved Overpass JSON extract at
+`/osm-snapshots/COURSE_ID_WITHOUT_LOCAL_PREFIX.json` to allow review during
+an Overpass outage. Include `osm3s.timestamp_osm_base` and the geometry
+returned by `out geom`. The app labels the snapshot date and tries the live
+lookup first. Refresh your OSM data before integrating draft geometry.

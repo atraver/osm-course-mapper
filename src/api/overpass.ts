@@ -170,7 +170,7 @@ export interface OsmCourse {
  */
 export type OsmLookup =
   | { status: 'pending' }
-  | { status: 'found'; course: OsmCourse }
+  | { status: 'found'; course: OsmCourse; snapshotDate?: string }
   | { status: 'absent' }
   | { status: 'unknown'; message: string };
 
@@ -1052,7 +1052,7 @@ function delay(ms: number): Promise<void> {
  * cancellation nobody should be told about, the other is a failure worth
  * retrying.
  */
-async function attempt(query: string, signal?: AbortSignal): Promise<Attempt> {
+async function attempt(query: string, method: 'POST' | 'GET', signal?: AbortSignal): Promise<Attempt> {
   if (signal?.aborted) return { ok: false, aborted: true };
 
   const controller = new AbortController();
@@ -1065,14 +1065,16 @@ async function attempt(query: string, signal?: AbortSignal): Promise<Attempt> {
   signal?.addEventListener('abort', relayAbort);
 
   try {
-    const response = await fetch(OVERPASS_ENDPOINT, {
-      method: 'POST',
+    const parameters = new URLSearchParams({ data: query }).toString();
+    const url = method === 'GET' ? `${OVERPASS_ENDPOINT}?${parameters}` : OVERPASS_ENDPOINT;
+    const response = await fetch(url, {
+      method,
       signal: controller.signal,
       headers: {
-        'content-type': 'application/x-www-form-urlencoded',
         accept: 'application/json',
+        ...(method === 'POST' && { 'content-type': 'application/x-www-form-urlencoded' }),
       },
-      body: new URLSearchParams({ data: query }).toString(),
+      body: method === 'POST' ? parameters : undefined,
     });
     if (!response.ok) return { ok: false, message: `it answered ${response.status}` };
     /* An empty reply is one of Overpass's regular failure modes; `json()` throws
@@ -1093,12 +1095,14 @@ async function attempt(query: string, signal?: AbortSignal): Promise<Attempt> {
 
 /** The attempt, then one retry after a backoff, and no more (KTD11). */
 async function requestOverpass(query: string, signal?: AbortSignal): Promise<Attempt> {
-  const first = await attempt(query, signal);
+  const first = await attempt(query, 'POST', signal);
   if (first.ok || first.aborted) return first;
 
   await delay(OVERPASS_RETRY_BACKOFF_MS);
   if (signal?.aborted) return { ok: false, aborted: true };
-  return attempt(query, signal);
+  /* Some intermediaries reject browser POSTs. These short, public
+     read-only queries also fit Overpass's GET form. */
+  return attempt(query, 'GET', signal);
 }
 
 /* --- The cache ------------------------------------------------------------ */
@@ -1112,6 +1116,23 @@ const cache = new Map<string, OsmLookup>();
 /** Forget every cached answer. Tests use it; nothing in the app does. */
 export function clearOsmCache(): void {
   cache.clear();
+}
+
+/** An operator-provided, dated extract is a read-only fallback for a verified boundary. */
+async function lookupSnapshot(query: OsmCourseQuery, signal?: AbortSignal): Promise<OsmLookup | null> {
+  if (import.meta.env.VITE_OSM_SNAPSHOTS !== 'true' || !query.osmCourseId ||
+      !/^local:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(query.id)) return null;
+  try {
+    const response = await fetch(`/osm-snapshots/${query.id.slice(6)}.json`, { signal });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const date = body?.osm3s?.timestamp_osm_base?.slice(0, 10);
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const lookup = interpret(body, query);
+    return lookup?.status === 'found' ? { ...lookup, snapshotDate: date } : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1134,6 +1155,10 @@ export async function lookupOsmCourse(
   );
 
   if (!result.ok) {
+    if (!result.aborted) {
+      const snapshot = await lookupSnapshot(query, signal);
+      if (snapshot) return snapshot;
+    }
     return {
       status: 'unknown',
       message: result.aborted ? 'the lookup was cancelled' : result.message,

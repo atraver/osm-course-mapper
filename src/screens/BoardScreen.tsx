@@ -152,6 +152,12 @@ export function BoardScreen({
         </div>
       </div>
 
+      {osm.status === 'found' && osm.snapshotDate && (
+        <p style={{ margin: '18px 32px 0', color: 'var(--amber-500)' }}>
+          OpenStreetMap snapshot: {osm.snapshotDate}. Check current data before publishing edits.
+        </p>
+      )}
+
       {banner && (
         <div
           style={{

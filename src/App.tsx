@@ -336,6 +336,7 @@ export default function App() {
           save={state.boundary.save}
           courseName={course.name}
           sourceId={courseImagery(course.country)}
+          snapshotDate={state.osm.status === 'found' ? state.osm.snapshotDate : undefined}
           onChange={actions.moveBoundary}
           onReset={actions.resetBoundary}
           onSave={actions.saveBoundary}

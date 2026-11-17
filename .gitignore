@@ -18,3 +18,4 @@ venv/
 
 # Deployment-specific course data
 /public/course-catalog.json
+/public/osm-snapshots/
