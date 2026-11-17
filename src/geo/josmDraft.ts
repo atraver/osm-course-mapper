@@ -17,7 +17,7 @@ function validPosition([lon, lat]: Position): boolean {
 }
 
 /**
- * An upload-blocked JOSM layer of new, manually drawn features. Never invent
+ * An upload-blocked JOSM layer of new features retained in a saved review. Never invent
  * versions for existing OSM objects or translate ambiguous hazard tags.
  */
 export function josmDraft(hole: SavedHole): string | null {
@@ -49,7 +49,7 @@ export function josmDraft(hole: SavedHole): string | null {
     addWay(hole.playingLine.coordinates, false, tags);
   }
   for (const feature of hole.features) {
-    if (feature.origin !== 'drawn' || feature.osmAction !== 'create' || feature.osmId ||
+    if (feature.origin === 'osm' || feature.osmAction !== 'create' || feature.osmId ||
       feature.geometry.type !== 'Polygon' || feature.geometry.coordinates.length !== 1) continue;
     switch (feature.kind) {
       case 'tee':

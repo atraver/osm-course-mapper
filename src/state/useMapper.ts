@@ -1002,7 +1002,7 @@ function savedFeatureOf(s: MapperState, shape: HoleShape): SavedFeature | null {
     osmTags: shape.osmTag && tags.golf ? { ...tags, golf: shape.osmTag } : tags,
     proposal:
       origin === 'proposed' && provenance
-        ? { confidence: proposal?.confidence ?? shape.savedProposal?.confidence ?? 0, provenance }
+        ? { confidence: proposal?.confidence ?? shape.savedProposal?.confidence ?? null, provenance }
         : null,
   };
 }

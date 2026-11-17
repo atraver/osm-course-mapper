@@ -304,7 +304,10 @@ def _feature_problem(index: int, feature: dict[str, Any]) -> Invalid | None:
     if proposal is not None:
         acquired = (proposal.get("provenance") or {}).get("acquired")
         try:
-            dt.date.fromisoformat(str(acquired))
+            # Some imagery providers publish only the capture month.
+            # Validate that month without adding a fictitious day to the record.
+            value = str(acquired)
+            dt.date.fromisoformat(f"{value}-01" if len(value) == 7 and value[4] == "-" else value)
         except ValueError:
             return Invalid(
                 f"Feature {index}: the imagery acquisition date is not an ISO date.",

@@ -722,11 +722,11 @@ class SavedTeeSetBody(BaseModel):
 
 
 class ProposalBody(BaseModel):
-    """What a proposed feature carries that a drawn one cannot."""
+    """Saved outlines may also come from edge fitting, which has no confidence score."""
 
     model_config = ConfigDict(extra="forbid")
 
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float | None = Field(ge=0.0, le=1.0)
     provenance: ProvenanceBody
 
 

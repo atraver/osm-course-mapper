@@ -30,3 +30,18 @@ it('writes valid XML for new manual features and closes rings without sharing no
   expect(xml.querySelector('tag[v="green"]')).toBeNull();
   expect(josmDraft({ ...hole, lineSource: 'osm', osmHoleId: 'way/5', features: [hole.features[1]] })).toBeNull();
 });
+
+it('exports saved model-assisted outlines into the upload-blocked review layer', () => {
+  const modelGreen: SavedFeature = {
+    ...tee, kind: 'green', origin: 'proposed',
+    proposal: { confidence: null, provenance: {
+      acquired: '2017-06', gsdMeters: 0.45, source: 'GSImaps/seamlessphoto',
+      modelId: 'opencv/grabcut', itemId: 'example',
+    } },
+  };
+  const text = josmDraft({ ...hole, lineSource: 'osm_edited', features: [modelGreen] });
+  const xml = new DOMParser().parseFromString(text!, 'text/xml');
+  expect(xml.documentElement.getAttribute('upload')).toBe('never');
+  expect(xml.querySelectorAll('way')).toHaveLength(1);
+  expect(xml.querySelector('tag[k="golf"]')?.getAttribute('v')).toBe('green');
+});

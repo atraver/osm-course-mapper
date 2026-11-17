@@ -56,7 +56,7 @@ export interface SavedFeature {
   osmTags: Record<string, string>;
   /** Present exactly when `origin` is `proposed`. */
   proposal: {
-    confidence: number;
+    confidence: number | null;
     provenance: {
       acquired: string;
       gsdMeters: number;
@@ -178,7 +178,7 @@ function featureFromWire(value: unknown): SavedFeature | null {
     proposal:
       proposal && provenance
         ? {
-            confidence: Number(proposal.confidence ?? 0),
+            confidence: typeof proposal.confidence === 'number' ? proposal.confidence : null,
             provenance: {
               acquired: String(provenance.acquired ?? ''),
               gsdMeters: Number(provenance.gsd_meters ?? 0),
