@@ -23,7 +23,7 @@ import type { CourseFeature, LngLat } from '../geo/coords';
 import { Button, Icon } from '../ds';
 import { HoverButton } from '../components/HoverButton';
 import { BaseMap, type ImageryStatus } from '../map/BaseMap';
-import { corridorOverlay, type CorridorOverlay } from '../map/imagerySources';
+import { courseImagery, corridorOverlay, type CorridorOverlay } from '../map/imagerySources';
 import { useShapeEditor } from '../map/useShapeEditor';
 import type { DetectionImagery, Proposal } from '../api/detect';
 import { LOCATE_CLOSE_ENOUGH, type MapBounds, type Mapper } from '../state/useMapper';
@@ -919,6 +919,7 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
       <div style={{ position: 'relative', overflow: 'hidden', background: '#22321f' }}>
         <BaseMap
           bounds={frame.current.bounds}
+          sourceId={courseImagery(course?.country)}
           center={course ? [course.longitude, course.latitude] : undefined}
           label={osmHoleRef ? `Hole ${holeNum} · ${osmHoleRef}` : `Hole ${holeNum}`}
           note={`${measurement} · ${teeSetName} says ${cardText}`}
@@ -1268,6 +1269,9 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
                 {/* Detection answered, or was stopped: say so, and keep both ways on. */}
                 {locateDone ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    {course?.country === 'JP' && (
+                      <RailNotice>Automatic proposals use U.S. aerial data. Review this hole by hand.</RailNotice>
+                    )}
                     {state.detect.status === 'no_coverage' && (
                       <RailNotice>
                         Nothing to propose on this hole — {state.detect.message} Nothing went wrong; every step is yours to
@@ -1282,9 +1286,11 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
                     <Button size="lg" variant="accent" fullWidth onClick={actions.confirmLocate}>
                       Carry on and map it by hand
                     </Button>
-                    <HoverButton onClick={actions.requestProposals} style={{ ...GHOST_BUTTON, height: 42 }} hoverStyle={GHOST_HOVER}>
-                      Look in the imagery again
-                    </HoverButton>
+                    {course?.country !== 'JP' && (
+                      <HoverButton onClick={actions.requestProposals} style={{ ...GHOST_BUTTON, height: 42 }} hoverStyle={GHOST_HOVER}>
+                        Look in the imagery again
+                      </HoverButton>
+                    )}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>

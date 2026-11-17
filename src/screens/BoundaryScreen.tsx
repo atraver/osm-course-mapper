@@ -16,6 +16,7 @@ import { Button, Icon } from '../ds';
 import { HoverButton } from '../components/HoverButton';
 import { areaAcres, openRing, type LngLat } from '../geo/coords';
 import { BaseMap } from '../map/BaseMap';
+import type { ImagerySourceId } from '../map/imagerySources';
 import { useShapeEditor, type EditablePath } from '../map/useShapeEditor';
 import type { SaveState } from '../state/useMapper';
 
@@ -29,6 +30,7 @@ interface BoundaryScreenProps {
   save: SaveState;
   /** The name the contributor searched for, which may differ from the OSM name. */
   courseName: string;
+  sourceId?: ImagerySourceId;
   onChange: (geometry: Polygon | MultiPolygon) => void;
   onReset: () => void;
   onSave: () => void;
@@ -92,6 +94,7 @@ export function BoundaryScreen({
   edited,
   save,
   courseName,
+  sourceId,
   onChange,
   onReset,
   onSave,
@@ -167,6 +170,7 @@ export function BoundaryScreen({
       <div style={{ position: 'relative', overflow: 'hidden', background: '#22321f' }}>
         <BaseMap
           bounds={course.bbox}
+          sourceId={sourceId}
           label={courseName}
           note={editing ? 'reshaping the edge' : edited ? 'your corrected edge' : 'the line OpenStreetMap already holds'}
           onMapReady={handleMapReady}
@@ -199,7 +203,7 @@ export function BoundaryScreen({
               {course.osmId}
             </span>
             <span>
-              matched by {course.matchedBy === 'name' ? 'its name tag' : 'its position'}
+              matched by {course.matchedBy === 'id' ? 'its OSM ID' : course.matchedBy === 'name' ? 'its name tag' : 'its position'}
             </span>
           </div>
         </BaseMap>

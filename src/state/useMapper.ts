@@ -1840,7 +1840,7 @@ export function useMapper() {
    */
   const runDetection = useCallback(
     (points: readonly LngLat[]) => {
-      if (points.length < 2) return;
+      if (points.length < 2 || state.course?.country === 'JP') return;
 
       dropDetection();
       const controller = new AbortController();
@@ -1922,7 +1922,9 @@ export function useMapper() {
     if (points.length < 2 || finished) return;
     patch((s) => ({
       locate: { ...s.locate, finished: true },
-      lastAction: 'Line locked in — looking along it for the tees, the green, the fairway and the sand …',
+      lastAction: s.course?.country === 'JP'
+        ? 'Line confirmed. Review the hole by hand.'
+        : 'Line locked in — looking along it for the tees, the green, the fairway and the sand …',
     }));
     runDetection(points);
   }, [state.locate, patch, runDetection]);

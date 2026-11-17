@@ -132,3 +132,49 @@ Every map surface credits the pixels actually on screen, and the review rail car
 Working end to end from search through per-feature confirmation, with decisions persisted. **The OpenStreetMap write path is not built** — nothing uploads. That is the next slice.
 
 Two known rough edges: the Overpass query returns ~250 KB on a dense club against an 8-second budget, so busy periods will report "we could not check OpenStreetMap" more often than a quiet course does; and detection quality varies with what NAIP happened to see.
+
+### Local courses and manual mapping in Japan
+
+For courses missing from OpenGolfAPI, set `VITE_LOCAL_COURSE_CATALOG=true` and
+put `course-catalog.json` in `public/` before building (or serve it at the
+same-origin path `/course-catalog.json`). The catalogue is a JSON object with
+a `courses` array. Give each physical layout its own stable `local:` ID;
+changing an ID also changes which saved drafts the app opens. Course names
+and aliases are searchable in either English or Japanese.
+
+```json
+{
+  "courses": [
+    {
+      "id": "local:example-north",
+      "course_name": "Example North",
+      "aliases": ["例ゴルフ倶楽部 北コース"],
+      "country": "JP",
+      "latitude": 41.8,
+      "longitude": 140.6,
+      "holes": 9
+    }
+  ]
+}
+```
+
+Use a verified hole count, or supply numbered `holes_data` and `tees` using
+the same fields as OpenGolfAPI. One record can optionally name a verified
+`osm_id` such as `way/12345` or `relation/12345`. Without this field the
+app will not adopt a nearby course's geometry. Keep separate physical nines
+and scorecard provenance in your catalogue. The file is publicly readable
+wherever the app is served, so only include data you intend to share there.
+
+For Japan, the map uses [GSI seamless aerial imagery](https://cyberjapandata.gsi.go.jp/development/).
+Automatic proposals still require U.S. NAIP imagery. The Japan workflow goes
+straight to manual review and never sends playing lines to the detection service.
+
+### Reviewing drafts in JOSM
+
+After saving a hole, download its JOSM review draft if it contains a new,
+manually drawn line, tee, green, fairway or bunker. Open the file as a separate
+layer and download current OSM data into an editable layer. Compare for
+duplicates, align imagery against local reference points, and copy only
+reviewed features. For manual tracing from the GSI layer, record
+`source=GSImaps/seamlessphoto` where appropriate. The draft layer blocks upload
+and download: it never modifies existing objects or writes to OpenStreetMap.

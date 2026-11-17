@@ -226,8 +226,46 @@ async function fetchJson(
   }
 }
 
+export const LOCAL_CATALOG_ENABLED = import.meta.env.VITE_LOCAL_COURSE_CATALOG === 'true';
+const LOCAL_ID = /^local:[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const OSM_ID = /^(?:way|relation)\/[1-9][0-9]*$/;
+const localSearchKey = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+
+export function readLocalCourses(value: unknown): { detail: CourseDetail; names: string[] }[] {
+  const rows = asRecord(value).courses;
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set<string>();
+  const records: { detail: CourseDetail; names: string[] }[] = [];
+  for (const row of rows) {
+    const raw = asRecord(row);
+    const detail = toDetail(raw);
+    const count = detail?.holes;
+    if (!detail || !LOCAL_ID.test(detail.id) || seen.has(detail.id) ||
+      Math.abs(detail.latitude) > 90 || Math.abs(detail.longitude) > 180 ||
+      (raw.country !== 'JP' && raw.country !== 'US') ||
+      (raw.osm_id !== undefined && (typeof raw.osm_id !== 'string' || !OSM_ID.test(raw.osm_id))) ||
+      (count !== undefined && (!Number.isInteger(count) || count < 1 || count > 72)) ||
+      (detail.holes_data.length === 0 && count === undefined)) continue;
+    const numbers = detail.holes_data.map(hole => hole.number);
+    if (numbers.length > 72 || new Set(numbers).size !== numbers.length ||
+        numbers.some(number => !Number.isInteger(number) || number < 1 || number > 72) ||
+        (count !== undefined && numbers.length > 0 && numbers.length !== count)) continue;
+    seen.add(detail.id);
+    detail.country = raw.country;
+    detail.osmCourseId = typeof raw.osm_id === 'string' ? raw.osm_id : null;
+    const aliases = Array.isArray(raw.aliases) ? raw.aliases.map(optionalString).filter((name): name is string => name !== undefined) : [];
+    records.push({ detail, names: [detail.course_name, detail.club_name, detail.city, ...aliases].filter((name): name is string => name !== undefined) });
+  }
+  return records;
+}
+
+async function localCourses(signal?: AbortSignal) {
+  const fetched = await fetchJson('/course-catalog.json', signal);
+  return fetched.ok ? { status: 'ok' as const, data: readLocalCourses(fetched.body) } : fetched.result;
+}
+
 /**
- * Search courses by name, filtered to the US per R13.
+ * Search courses by name: optional local entries first, then the US OpenGolfAPI feed.
  *
  * Resolves to `empty` when the query is blank, when the API returns no records,
  * or when every record it returned falls outside the US — a populated non-US page
@@ -240,6 +278,19 @@ export async function searchCourses(
 ): Promise<ApiResult<CourseSummary[]>> {
   const trimmed = query.trim();
   if (trimmed === '') return { status: 'empty' };
+
+  if (LOCAL_CATALOG_ENABLED) {
+    const local = await localCourses(signal);
+    if (local.status === 'aborted') return local;
+    if (local.status === 'ok') {
+      const key = localSearchKey(trimmed);
+      const matches = local.data.filter(record => record.names.some(name => localSearchKey(name).includes(key)));
+      if (matches.length) return {
+        status: 'ok',
+        data: matches.slice(0, limit).map(({ detail }) => ({ ...detail, name: detail.course_name })),
+      };
+    }
+  }
 
   const url = new URL('/v1/courses/search', API_BASE);
   url.searchParams.set('q', trimmed);
@@ -273,6 +324,13 @@ export async function getCourse(
   id: string,
   signal?: AbortSignal,
 ): Promise<ApiResult<CourseDetail>> {
+  if (LOCAL_ID.test(id)) {
+    if (!LOCAL_CATALOG_ENABLED) return { status: 'empty' };
+    const local = await localCourses(signal);
+    if (local.status !== 'ok') return local;
+    const record = local.data.find(({ detail }) => detail.id === id);
+    return record ? { status: 'ok', data: record.detail } : { status: 'empty' };
+  }
   const url = new URL(`/api/v1/courses/${encodeURIComponent(id)}`, API_BASE);
 
   const fetched = await fetchJson(url.toString(), signal);

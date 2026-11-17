@@ -15,3 +15,6 @@ __pycache__/
 venv/
 # `uvicorn service.local:app` keeps its SQLite store here
 .local/
+
+# Deployment-specific course data
+/public/course-catalog.json

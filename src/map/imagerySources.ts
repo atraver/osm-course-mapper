@@ -17,7 +17,7 @@
 import type { DetectionImagery } from '../api/detect';
 
 /** Which imagery a map surface draws. */
-export type ImagerySourceId = 'esri-world-imagery' | 'usgs-naip';
+export type ImagerySourceId = 'esri-world-imagery' | 'usgs-naip' | 'gsi-seamlessphoto';
 
 /** Everything the map needs to draw and credit one imagery source. */
 export interface ImagerySource {
@@ -80,6 +80,17 @@ export const IMAGERY_SOURCES: Record<ImagerySourceId, ImagerySource> = {
       'Aerial and satellite passes composited by Esri; capture date varies by area. Full detail to zoom 19 — closer views enlarge the zoom 19 imagery.',
     osmSourceTag: 'Esri',
   },
+  'gsi-seamlessphoto': {
+    id: 'gsi-seamlessphoto',
+    label: 'GSI aerial imagery',
+    tiles: ['https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg'],
+    tileSize: 256,
+    minzoom: 14,
+    maxzoom: 18,
+    attribution: 'Imagery: Geospatial Information Authority of Japan (地理院タイル)',
+    captureContext: 'GSI seamless aerial imagery. Capture dates vary by location.',
+    osmSourceTag: 'GSImaps/seamlessphoto',
+  },
   'usgs-naip': {
     id: 'usgs-naip',
     label: 'USGS NAIP',
@@ -108,6 +119,11 @@ export const IMAGERY_SOURCES: Record<ImagerySourceId, ImagerySource> = {
 
 /** Esri unless something says otherwise (KTD1). */
 export const DEFAULT_IMAGERY_SOURCE_ID: ImagerySourceId = 'esri-world-imagery';
+
+export function courseImagery(country?: 'US' | 'JP'): ImagerySourceId {
+  return country === 'JP' ? 'gsi-seamlessphoto' : DEFAULT_IMAGERY_SOURCE_ID;
+}
+
 
 /** The source a given id names, defaulting to Esri. */
 export function imagerySource(id: ImagerySourceId = DEFAULT_IMAGERY_SOURCE_ID): ImagerySource {

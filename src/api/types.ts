@@ -56,6 +56,9 @@ export interface CourseDetail {
   id: string;
   course_name: string;
   club_name?: string;
+  country?: 'US' | 'JP';
+  /** For local records: exact OSM boundary, or null when none is verified. */
+  osmCourseId?: string | null;
   city?: string;
   state?: string;
   latitude: number;

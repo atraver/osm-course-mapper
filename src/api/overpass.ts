@@ -157,7 +157,7 @@ export interface OsmCourse {
   holes: OsmHole[];
   landmarks: OsmLandmark[];
   /** Which of the two rules adopted this course, so the screen can say. */
-  matchedBy: 'name' | 'proximity';
+  matchedBy: 'id' | 'name' | 'proximity';
 }
 
 /**
@@ -181,6 +181,8 @@ export interface OsmCourseQuery {
   name: string;
   latitude: number;
   longitude: number;
+  /** Exact boundary for a local catalogue record; null means no verified association. */
+  osmCourseId?: string | null;
   /**
    * The card, hole by hole, when the record carried one.
    *
@@ -525,7 +527,11 @@ interface Candidate {
 function selectCandidate(
   candidates: Candidate[],
   query: OsmCourseQuery,
-): { candidate: Candidate; matchedBy: 'name' | 'proximity' } | null {
+): { candidate: Candidate; matchedBy: 'id' | 'name' | 'proximity' } | null {
+  if (query.osmCourseId !== undefined) {
+    const candidate = candidates.find(item => item.osmId === query.osmCourseId);
+    return candidate ? { candidate, matchedBy: 'id' } : null;
+  }
   if (candidates.length === 0) return null;
 
   let best: Candidate | null = null;

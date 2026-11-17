@@ -1,3 +1,5 @@
+import type { SavedHole } from '../api/holes';
+import { josmDraft } from '../geo/josmDraft';
 import { Button, Icon } from '../ds';
 
 interface CompleteModalProps {
@@ -8,6 +10,7 @@ interface CompleteModalProps {
   /** Holes finished on this course: saved here, or already in OpenStreetMap. */
   doneCount: number;
   holeCount: number;
+  savedHole?: SavedHole;
   onNextHole: () => void;
   onBack: () => void;
 }
@@ -18,9 +21,20 @@ export function CompleteModal({
   saved,
   doneCount,
   holeCount,
+  savedHole,
   onNextHole,
   onBack,
 }: CompleteModalProps) {
+  const draft = savedHole ? josmDraft(savedHole) : null;
+  const download = () => {
+    if (!draft) return;
+    const uri = URL.createObjectURL(new Blob([draft], { type: 'application/xml' }));
+    const link = document.createElement('a');
+    link.href = uri;
+    link.download = `hole-${holeNum}-review.osm`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(uri), 1000);
+  };
   return (
     <div
       style={{
@@ -106,6 +120,18 @@ export function CompleteModal({
         >
           not uploaded · {doneCount} of {holeCount} holes done
         </div>
+
+        {draft && (
+          <div style={{ marginBottom: 18 }}>
+            <Button size="lg" variant="secondary" onClick={download}>
+              Download JOSM review draft
+            </Button>
+            <p style={{ fontSize: 12, color: 'var(--ink-600)' }}>
+              Includes new, manually drawn lines, tees, greens, fairways and bunkers.
+              Compare the draft with current OpenStreetMap data before copying reviewed features.
+            </p>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 10 }}>
           <Button size="lg" variant="primary" onClick={onNextHole}>

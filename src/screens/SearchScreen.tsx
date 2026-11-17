@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { searchCourses } from '../api/opengolf';
+import { LOCAL_CATALOG_ENABLED, searchCourses } from '../api/opengolf';
 import type { CourseSummary } from '../api/types';
 import { Icon } from '../ds';
 import { HoverButton } from '../components/HoverButton';
@@ -134,14 +134,16 @@ export function SearchScreen({ query, onQuery, onOpen }: SearchScreenProps) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {result.kind === 'idle' && (
-            <Notice>Type a course name to search courses in the United States.</Notice>
+            <Notice>{LOCAL_CATALOG_ENABLED
+              ? 'Type a course name in English or Japanese.'
+              : 'Type a course name to search courses in the United States.'}</Notice>
           )}
 
           {result.kind === 'loading' && <Notice>Searching for “{query.trim()}” …</Notice>}
 
           {result.kind === 'empty' && (
             <Notice>
-              No United States courses match “{query.trim()}”. Try the course name on its own, or a
+              No {LOCAL_CATALOG_ENABLED ? '' : 'United States '}courses match “{query.trim()}”. Try the course name on its own, or a
               different spelling.
             </Notice>
           )}

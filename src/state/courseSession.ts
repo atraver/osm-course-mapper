@@ -46,6 +46,8 @@ export interface CourseSession {
   cardAvailable: boolean;
   latitude: number;
   longitude: number;
+  country?: CourseDetail['country'];
+  osmCourseId?: CourseDetail['osmCourseId'];
 }
 
 /** One row of a hole's card, ready to render. */
@@ -215,6 +217,8 @@ export function buildCourseSession(detail: CourseDetail): CourseSession {
     cardAvailable,
     latitude: detail.latitude,
     longitude: detail.longitude,
+    country: detail.country,
+    osmCourseId: detail.osmCourseId,
   };
 }
 

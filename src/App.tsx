@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCourse } from './api/opengolf';
 import { getSavedBoundary, listSavedHoles, type SavedBoundary, type SavedHole } from './api/holes';
 import { lookupOsmCourse } from './api/overpass';
+import { courseImagery } from './map/imagerySources';
 import { TopNav, type NavItem } from './components/TopNav';
 import { BoardScreen } from './screens/BoardScreen';
 import { BoundaryScreen } from './screens/BoundaryScreen';
@@ -79,6 +80,7 @@ export default function App() {
             name: session.name,
             latitude: session.latitude,
             longitude: session.longitude,
+            osmCourseId: session.osmCourseId,
             /* The card goes with the query so the lookup can tell which of a
              * club's nines this eighteen plays — a composite's front nine is
              * identified by its pars, not by anything the hole tags say. */
@@ -333,6 +335,7 @@ export default function App() {
           edited={state.boundary.edited !== null}
           save={state.boundary.save}
           courseName={course.name}
+          sourceId={courseImagery(course.country)}
           onChange={actions.moveBoundary}
           onReset={actions.resetBoundary}
           onSave={actions.saveBoundary}
@@ -365,6 +368,7 @@ export default function App() {
           saved={summariseSavedHole(state.savedHoles[derived.holeNumber])}
           doneCount={derived.doneCount + derived.savedCount}
           holeCount={course.holes.length}
+          savedHole={state.savedHoles[derived.holeNumber]}
           onNextHole={actions.nextHole}
           onBack={() => actions.go('board')}
         />
