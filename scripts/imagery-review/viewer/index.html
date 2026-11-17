@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Course imagery review</title>
+<link rel="stylesheet" href="review.css">
+<main>
+  <header><a href="/">Course Mapper</a><h1 id="title">Imagery review</h1><span id="totals" aria-live="polite"></span></header>
+  <section aria-label="Aerial imagery"><svg id="map" role="img" aria-label="Course imagery and candidate outlines" preserveAspectRatio="xMidYMid meet"><image id="photo" href="imagery.jpg"/><g id="reference"></g><g id="shapes"></g></svg>
+    <nav aria-label="Map zoom"><button id="in" aria-label="Zoom in">+</button><button id="out" aria-label="Zoom out">−</button><button id="fit">Whole course</button></nav>
+    <aside><a href="https://maps.gsi.go.jp/development/ichiran.html">Imagery: GSI</a> · <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a></aside>
+  </section>
+  <div id="controls"><label>Feature <select id="filter"><option value="">All features</option></select></label><label><input type="checkbox" id="refs" checked> Reference outlines and playing lines</label><button id="next">Next pending</button><strong id="selection" aria-live="polite">Select an outline</strong><button id="keep" disabled>Keep</button><button id="skip" disabled>Skip</button><button id="undo" disabled>Clear decision</button><button id="export" disabled>Export kept GeoJSON</button></div>
+</main>
+<script src="review.js" defer></script>
+</html>

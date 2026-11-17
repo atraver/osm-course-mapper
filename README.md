@@ -166,13 +166,15 @@ and scorecard provenance in your catalogue. The file is publicly readable
 wherever the app is served, so only include data you intend to share there.
 
 For Japan, the map uses [GSI seamless aerial imagery](https://cyberjapandata.gsi.go.jp/development/).
-Automatic proposals still require U.S. NAIP imagery. The Japan workflow goes
-straight to manual review and never sends playing lines to the detection service.
+The web detection service requires U.S. NAIP imagery. For Japan, the per-hole editor
+opens in manual review. The optional [offline imagery runner](scripts/imagery-review/README.md)
+generates a course-wide GSI proposal queue from a boundary and optional playing lines.
+It runs SlimSAM in Docker and exports selected outlines as GeoJSON.
 
 ### Reviewing drafts in JOSM
 
-After saving a hole, download its JOSM review draft if it contains a new,
-manually drawn line, tee, green, fairway or bunker. Open the file as a separate
+After saving a hole, download its JOSM review draft if it contains a new
+playing line or a retained tee, green, fairway or bunker polygon. Open the file as a separate
 layer and download current OSM data into an editable layer. Compare for
 duplicates, align imagery against local reference points, and copy only
 reviewed features. For manual tracing from the GSI layer, record

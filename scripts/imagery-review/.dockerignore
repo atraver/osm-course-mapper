@@ -1,0 +1,4 @@
+*
+!*.py
+!viewer/
+!viewer/*
