@@ -57,7 +57,9 @@ export function josmDraft(hole: SavedHole): string | null {
       case 'fairway':
       case 'bunker': {
         const [key, value] = tagsByKind[feature.kind];
-        addWay(feature.geometry.coordinates[0], true, { [key]: value });
+        const tags: Record<string, string> = { [key]: value };
+        if (feature.osmTags.source === 'GSImaps/seamlessphoto') tags.source = feature.osmTags.source;
+        addWay(feature.geometry.coordinates[0], true, tags);
       }
     }
   }

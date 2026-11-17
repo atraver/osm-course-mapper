@@ -152,6 +152,12 @@ export function BoardScreen({
         </div>
       </div>
 
+      {course.country === 'JP' && osm.status === 'found' && (
+        <p style={{ margin: '18px 32px 0', color: 'var(--green-100)' }}>
+          Coverage counts playing lines. Tees, greens and hazards still need their own review.
+        </p>
+      )}
+
       {osm.status === 'found' && osm.snapshotDate && (
         <p style={{ margin: '18px 32px 0', color: 'var(--amber-500)' }}>
           OpenStreetMap snapshot: {osm.snapshotDate}. Check current data before publishing edits.

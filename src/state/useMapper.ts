@@ -167,6 +167,8 @@ export interface HoleShape {
   fromSaved?: boolean;
   /** The confidence and provenance a saved proposal was stored with — the `Proposal` itself is gone. */
   savedProposal?: SavedFeature['proposal'];
+  /** Imagery source retained when a manual draft is opened again. */
+  savedSource?: string;
   /**
    * The card tee set detection matched to this box, when that match was made on
    * a proposal this shape absorbed. See `reviewShapes`.
@@ -624,6 +626,7 @@ export function savedShapes(features: readonly SavedFeature[]): HoleShape[] {
         origin: feature.origin,
         proposal: null,
         savedProposal: feature.proposal,
+        savedSource: feature.osmTags.source,
         osmId: feature.osmId,
         osmTag: feature.origin === 'osm' ? (feature.osmTags.golf ?? null) : null,
         teeSetKey: null,
@@ -976,6 +979,10 @@ function savedFeatureOf(s: MapperState, shape: HoleShape): SavedFeature | null {
   const osmAction: OsmAction =
     origin !== 'osm' ? 'create' : shape.removed ? 'dispute' : shape.edited ? 'modify' : 'keep';
   const tags = osmTagsFor(shape.kind, shape.hazardType);
+  if (shape.savedSource) tags.source = shape.savedSource;
+  if (shape.origin === 'drawn' && !shape.fromSaved && s.course?.country === 'JP') {
+    tags.source = 'GSImaps/seamlessphoto';
+  }
   const kind = shape.kind === 'hazard' ? shape.hazardType : shape.kind;
   if (!kind) return null;
   const teeSets = shape.kind === 'tee' ? teeSetsFrom(s, shape.id) : [];

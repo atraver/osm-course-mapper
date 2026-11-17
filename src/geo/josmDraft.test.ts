@@ -6,7 +6,7 @@ import { josmDraft } from './josmDraft';
 const tee: SavedFeature = {
   kind: 'tee', origin: 'drawn', osmId: null, osmAction: 'create',
   geometry: { type: 'Polygon', coordinates: [[[140, 41], [140.1, 41], [140.1, 41.1], [140, 41]]] },
-  edited: false, teeSets: [], label: null, osmTags: {}, proposal: null,
+  edited: false, teeSets: [], label: null, osmTags: { source: 'GSImaps/seamlessphoto' }, proposal: null,
 };
 const hole: SavedHole = {
   courseId: 'local:north', holeNumber: 3, par: 4, lineSource: 'drawn', osmHoleId: null,
@@ -23,6 +23,7 @@ it('writes valid XML for new manual features and closes rings without sharing no
   const refs = (way: Element) => [...way.querySelectorAll('nd')].map(node => node.getAttribute('ref'));
   expect(line.querySelector('tag[k="ref"]')?.getAttribute('v')).toBe('3');
   expect(area.querySelector('tag[k="golf"]')?.getAttribute('v')).toBe('tee');
+  expect(area.querySelector('tag[k="source"]')?.getAttribute('v')).toBe('GSImaps/seamlessphoto');
   const ring = refs(area);
   expect(ring[0]).toBe(ring[3]);
   expect(refs(line).some(ref => ring.includes(ref))).toBe(false);

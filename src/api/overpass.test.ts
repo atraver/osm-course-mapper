@@ -535,7 +535,7 @@ describe('adopting an existing course boundary', () => {
       ...PEBBLE, id: 'local:linked', name: 'Example', osmCourseId: 'relation/3741806',
     });
     expect(linked).toMatchObject({ status: 'found', course: { matchedBy: 'id', osmId: 'relation/3741806' } });
-    expect(await lookupOsmCourse({ ...PEBBLE, id: 'local:unlinked', osmCourseId: null })).toEqual({ status: 'absent' });
+    expect(await lookupOsmCourse({ ...PEBBLE, id: 'local:unlinked', osmCourseId: null })).toMatchObject({ status: 'unknown' });
   });
 
   it('counts the holes OpenStreetMap holds inside the adopted line, and no others', async () => {

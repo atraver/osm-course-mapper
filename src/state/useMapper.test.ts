@@ -601,6 +601,28 @@ describe('drawing the line, and the line OpenStreetMap already holds', () => {
     expect(result.current.derived.canConfirmLine).toBe(false);
   });
 
+  it('keeps a Japanese hole manual and retains its imagery source after reopening', () => {
+    const hook = renderHook(() => useMapper());
+    act(() => hook.result.current.actions.openCourse({ ...SESSION, country: 'JP' }, { status: 'absent' }));
+    act(() => hook.result.current.actions.openHole(0));
+    for (const point of PEBBLE_LINE) act(() => hook.result.current.actions.onMapClick(point));
+    act(() => hook.result.current.actions.confirmLine());
+    expect(hook.result.current.derived.locateDone).toBe(true);
+    expect(detection.request).not.toHaveBeenCalled();
+    act(() => hook.result.current.actions.confirmLocate());
+    acceptUntil(hook, 'green');
+    act(() => hook.result.current.actions.startPlace('green'));
+    act(() => hook.result.current.actions.onMapClick(PEBBLE_GREEN));
+    act(() => hook.result.current.actions.confirmNew());
+    const hole = holeToSave(hook.result.current.state)!;
+    expect(hole.features[0].osmTags.source).toBe('GSImaps/seamlessphoto');
+    const [shape] = savedShapes(hole.features);
+    const reopened = holeToSave({
+      ...hook.result.current.state, shapes: [{ ...shape, confirmed: true }],
+    });
+    expect(reopened?.features[0].osmTags.source).toBe('GSImaps/seamlessphoto');
+  });
+
   it('asks detection about the confirmed line with the par and every card tee set, once', () => {
     /* Confirming the line *is* the request — a second button would ask the
      * contributor to state the same intent twice. */

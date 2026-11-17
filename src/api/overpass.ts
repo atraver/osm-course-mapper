@@ -1148,6 +1148,10 @@ export async function lookupOsmCourse(
 ): Promise<OsmLookup> {
   const cached = cache.get(query.id);
   if (cached) return cached;
+  if (query.osmCourseId === null) return {
+    status: 'unknown',
+    message: 'no verified OSM boundary is linked to this local course',
+  };
 
   const result = await requestOverpass(
     overpassQuery(overpassBbox(query.latitude, query.longitude)),
