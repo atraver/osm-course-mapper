@@ -75,6 +75,8 @@ export function BoardScreen({
   /* R16: with no answer from OpenStreetMap there is no number to print. */
   const countKnown = osm.status === 'found' || osm.status === 'absent';
   const banner = osmBanner(osm, course.name);
+  const mappedLineCount = course.country === 'JP' && osm.status === 'found'
+    ? new Set(osm.course.mappedHoleRefs).size : doneCount;
 
   return (
     <section>
@@ -129,10 +131,10 @@ export function BoardScreen({
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {doneCount}
+                  {mappedLineCount}
                 </span>
                 <span style={{ fontSize: 14, color: 'var(--green-200)' }}>
-                  of {course.holes.length} holes on the map
+                  of {course.holes.length} {course.country === 'JP' ? 'playing lines in OpenStreetMap' : 'holes on the map'}
                 </span>
               </>
             ) : (

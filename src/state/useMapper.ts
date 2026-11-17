@@ -30,6 +30,7 @@ import {
   type HoleStatus,
   type ShapeKind,
   type Step,
+  type StepId,
 } from '../data/course';
 import {
   bearingBetween,
@@ -229,6 +230,7 @@ export interface MapperState {
   teeSet: string | null;
   /** Position in `STEPS`. Past the end is "every check done". */
   step: number;
+  reviewedSteps: StepId[];
   /** Which of the card's tee sets the tee step is asking about. */
   teeIndex: number;
   /**
@@ -327,6 +329,7 @@ const MAX_TEE_SETS = 8;
 /** Everything a hole resets to when it is opened, or its line is confirmed again. */
 const FRESH_REVIEW = {
   step: 0,
+  reviewedSteps: [] as StepId[],
   teeIndex: 0,
   teeBoxes: {} as Record<string, string | null>,
   shapes: [] as HoleShape[],
@@ -1017,6 +1020,7 @@ export function holeToSave(s: MapperState): SavedHole | null {
     courseId: course.id,
     holeNumber: openHoleNumber(s),
     par: hole?.par ?? null,
+    reviewedSteps: s.reviewedSteps,
     playingLine: playingLine(s.locate.points),
     lineSource: s.locate.source === 'osm' ? (s.locate.edited ? 'osm_edited' : 'osm') : 'drawn',
     osmHoleId: s.osmHoleId,
@@ -1026,7 +1030,8 @@ export function holeToSave(s: MapperState): SavedHole | null {
      * OpenStreetMap, and the upload has to hear that somebody disputed it.
      */
     features: s.shapes
-      .filter((shape) => (shape.confirmed && !shape.removed) || (shape.origin === 'osm' && shape.removed))
+      .filter((shape) => (shape.confirmed && !shape.removed) || (shape.origin === 'osm' && shape.removed) ||
+        (shape.fromSaved && !shape.removed))
       .map((shape) => savedFeatureOf(s, shape))
       .filter((feature): feature is SavedFeature => feature !== null),
   };
@@ -1271,8 +1276,11 @@ export function computeDerived(s: MapperState) {
       ...(confirmedOf('hazard').length > 0
         ? [confirmedOf('hazard').map((shape) => hazardLabel(shape.hazardType).toLowerCase()).join(', ')]
         : []),
-    ],
+    ].map((text, index) => index > 0 && !s.reviewedSteps.includes(STEPS[index - 1].id)
+      ? `${STEPS[index - 1].kicker}: unreviewed` : text),
     canSave: allDone && locateLine !== null && s.save.status !== 'saving',
+    canSaveDraft: locateDone && !isLocate && s.interaction.kind === 'none' && s.save.status !== 'saving',
+    reviewComplete: STEPS.every(step => s.reviewedSteps.includes(step.id)),
   };
 }
 
@@ -1472,10 +1480,13 @@ export function useMapper() {
   );
 
   /** The next step, with its own opening line. */
-  const nextStep = (s: MapperState, note?: string): Partial<MapperState> => {
+  const nextStep = (s: MapperState, note?: string, reviewed = true): Partial<MapperState> => {
     const step = stepAt(s);
     return {
       step: s.step + 1,
+      reviewedSteps: reviewed && step
+        ? [...new Set([...s.reviewedSteps, step.id])]
+        : s.reviewedSteps.filter(id => id !== step?.id),
       teeIndex: 0,
       interaction: NO_INTERACTION,
       lastAction: note ?? step?.done ?? '',
@@ -1512,7 +1523,7 @@ export function useMapper() {
 
     if (step.id === 'green') {
       const green = greenCandidate(s);
-      patch({ ...(green ? confirming(s, [green.id]) : {}), ...nextStep(s, green ? step.done : 'Green left for later.') });
+      patch({ ...(green ? confirming(s, [green.id]) : {}), ...nextStep(s, green ? step.done : 'Green left for later.', !!green) });
       return;
     }
 
@@ -1524,6 +1535,12 @@ export function useMapper() {
     const ids = liveShapes(s, step.kind).map((shape) => shape.id);
     patch({ ...confirming(s, ids), ...nextStep(s) });
   }, [state, patch, confirming]);
+
+  /** Leave a category unfinished without recording a confirming or rejecting answer. */
+  const deferStep = useCallback(() => {
+    if (isBlocked(state) || state.interaction.kind !== 'none' || state.mode === 'locate' || !stepAt(state)) return;
+    patch(nextStep(state, 'Left for later. No absence recorded.', false));
+  }, [state, patch]);
 
   /** Wait for the next map click to drop a new outline of this kind. */
   const startPlace = useCallback(
@@ -1949,6 +1966,7 @@ export function useMapper() {
       return {
         mode: 'ready',
         ...FRESH_REVIEW,
+        reviewedSteps: s.savedHoles[openHoleNumber(s)]?.reviewedSteps ?? [],
         shapes,
         teeBoxes: { ...guessTeeBoxes(teeSetsOf(s), shapes, s.locate.points), ...savedTeeBoxes(shapes, s.previous) },
         locate: { ...s.locate, finished: s.locate.points.length >= 2 },
@@ -1970,7 +1988,7 @@ export function useMapper() {
    */
   const saveHole = useCallback(() => {
     const hole = holeToSave(state);
-    if (!hole || state.save.status === 'saving') return;
+    if (!hole || !state.locate.finished || state.interaction.kind !== 'none' || state.save.status === 'saving') return;
     dropSave();
     const controller = new AbortController();
     saveRun.current = controller;
@@ -2030,6 +2048,7 @@ export function useMapper() {
           screen: 'review',
           mode: status === 'attention' ? 'attention' : 'locate',
           ...FRESH_REVIEW,
+          reviewedSteps: saved?.reviewedSteps ?? [],
           locate,
           existing: seed.existing,
           osmHoleRef: seed.osmHoleRef,
@@ -2159,6 +2178,7 @@ export function useMapper() {
       moveLine,
       onMapClick,
       saveHole,
+      deferStep,
       openHole,
       nextHole,
       requestProposals,

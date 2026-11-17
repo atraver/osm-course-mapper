@@ -396,6 +396,7 @@ export function renderAll(): Record<string, string> {
         mapper={mapperFor(
           reviewing({
             step: STEPS.length,
+            reviewedSteps: STEPS.map(step => step.id),
             shapes: shapesFromProposals(PROPOSALS).map((shape) => ({ ...shape, confirmed: true })),
           }),
         )}

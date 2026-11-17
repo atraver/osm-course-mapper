@@ -1940,6 +1940,27 @@ describe('decisions', () => {
 });
 
 describe('saving the hole', () => {
+  it('defers categories without accepting proposals and preserves a prior green when saving an unfinished pass', async () => {
+    const hook = await openedWith([proposal('p-green', 'green', AT.green)]);
+    act(() => hook.result.current.actions.deferStep()); // tee sets left unknown
+    expect(hook.result.current.state.reviewedSteps).toEqual([]);
+    expect(hook.result.current.state.decided).toEqual([]);
+    act(() => hook.result.current.actions.accept()); // the highlighted green
+    expect(hook.result.current.state.reviewedSteps).toEqual(['green']);
+    expect(hook.result.current.derived.canSaveDraft).toBe(true);
+    expect(hook.result.current.derived.summary).toContain('Tee boxes: unreviewed');
+    const saved = holeToSave(hook.result.current.state)!;
+    expect(saved.reviewedSteps).toEqual(['green']);
+    expect(saved.features.map(feature => feature.kind)).toEqual(['green']);
+    const reopened = { ...hook.result.current.state, reviewedSteps: STEPS.map(step => step.id),
+      shapes: savedShapes(saved.features) };
+    expect(holeToSave(reopened)?.features).toHaveLength(1);
+    act(() => hook.result.current.actions.saveHole());
+    await settle();
+    expect(hook.result.current.state.savedHoles[1].reviewedSteps).toEqual(['green']);
+  });
+
+
   /** A hole walked all the way through, with something of every kind in it. */
   async function walkedThrough() {
     const proposals = [
@@ -2050,7 +2071,7 @@ describe('saving the hole', () => {
     expect(String(saves[0][0])).toMatch(/\/v1\/holes$/);
     const body = JSON.parse(saves[0][1].body);
     expect(Object.keys(body).sort()).toEqual(
-      ['course_id', 'features', 'hole_number', 'line_source', 'osm_hole_id', 'par', 'playing_line'].sort(),
+      ['course_id', 'features', 'hole_number', 'line_source', 'osm_hole_id', 'par', 'playing_line', 'reviewed_steps'].sort(),
     );
     expect(body).toMatchObject({ course_id: 'pebble', hole_number: 1, par: 4, line_source: 'drawn', osm_hole_id: null });
     expect(Object.keys(body.features[0]).sort()).toEqual(

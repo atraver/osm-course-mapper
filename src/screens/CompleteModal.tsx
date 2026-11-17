@@ -1,3 +1,4 @@
+import { STEPS } from '../data/course';
 import type { SavedHole } from '../api/holes';
 import { josmDraft } from '../geo/josmDraft';
 import { Button, Icon } from '../ds';
@@ -26,6 +27,9 @@ export function CompleteModal({
   onBack,
 }: CompleteModalProps) {
   const draft = savedHole ? josmDraft(savedHole) : null;
+  const unreviewed = savedHole?.reviewedSteps
+    ? STEPS.filter(step => !savedHole.reviewedSteps?.includes(step.id))
+    : [];
   const download = () => {
     if (!draft) return;
     const uri = URL.createObjectURL(new Blob([draft], { type: 'application/xml' }));
@@ -95,6 +99,12 @@ export function CompleteModal({
           yet.
         </p>
 
+        {unreviewed.length > 0 && (
+          <p style={{ fontSize: 14, color: 'var(--ink-600)' }}>
+            Partial draft: {unreviewed.map(step => step.kicker.toLowerCase()).join(', ')} still need review.
+          </p>
+        )}
+
         <div
           style={{
             background: 'var(--white)',
@@ -118,7 +128,8 @@ export function CompleteModal({
             marginBottom: 22,
           }}
         >
-          not uploaded · {doneCount} of {holeCount} holes done
+          {unreviewed.length > 0 ? 'not uploaded · draft incomplete'
+            : `not uploaded · ${doneCount} of ${holeCount} holes done`}
         </div>
 
         {draft && (

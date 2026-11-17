@@ -1087,7 +1087,7 @@ describe('the hazard step', () => {
     expect(first.getByRole('radio', { name: 'Water' }).getAttribute('aria-checked')).toBe('false');
 
     await press('That is all of them');
-    expect(screen.getByText('Hole 1, confirmed.')).toBeDefined();
+    expect(screen.getByText('Hole 1: partial draft.')).toBeDefined();
     expect(screen.getByText('waste area, trees')).toBeDefined();
   });
 

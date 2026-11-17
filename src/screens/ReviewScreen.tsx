@@ -665,6 +665,8 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
     editablePaths,
     rejectedHere,
     canSave,
+    canSaveDraft,
+    reviewComplete,
     detectionImagery,
   } = derived;
 
@@ -869,7 +871,7 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
   const stepCounter = isLocate
     ? 'first, the line of the hole'
     : allDone
-      ? 'all checks done'
+      ? reviewComplete ? 'all checks done' : 'partial draft'
       : `check ${state.step + 1} of ${STEPS.length}`;
 
   /* --- What the map is waiting for, said across its top ------------------- */
@@ -1538,6 +1540,11 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
               </div>
             </div>
 
+            <HoverButton onClick={actions.deferStep} disabled={interaction.kind !== 'none'}
+              style={{ ...GHOST_BUTTON, width: '100%', height: 40, marginTop: 10 }} hoverStyle={GHOST_HOVER}>
+              Review this category later
+            </HoverButton>
+
             {/* R10: a rejection is a record. Say so where it was made. */}
             {rejectedHere.length > 0 && (
               <div style={{ marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--green-200)' }}>
@@ -1549,6 +1556,12 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
               {step?.id === 'hazards' ? 'A to accept · M to draw one' : 'A to accept · N for the first “no” · M missed one · Esc to back out'}
             </div>
           </div>
+        )}
+
+        {!isLocate && !allDone && (
+          <Button size="lg" variant="secondary" fullWidth onClick={actions.saveHole} disabled={!canSaveDraft}>
+            Save current draft
+          </Button>
         )}
 
         {state.lastAction && (
@@ -1584,7 +1597,7 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
               animation: 'ogRise 190ms var(--ease-out)',
             }}
           >
-            <h3 style={{ ...H3, fontSize: 20, margin: '0 0 10px' }}>Hole {holeNum}, confirmed.</h3>
+            <h3 style={{ ...H3, fontSize: 20, margin: '0 0 10px' }}>{reviewComplete ? `Hole ${holeNum}, confirmed.` : `Hole ${holeNum}: partial draft.`}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 16 }}>
               {summary.map((text) => (
                 <div

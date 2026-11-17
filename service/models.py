@@ -358,6 +358,8 @@ class SavedHole(Base):
     #: edit flag, tee sets, label, OSM tags and (for proposals) confidence and
     #: imagery provenance. Validated by `holes.py` before it lands here.
     features: Mapped[list[dict[str, Any]]] = mapped_column(GeoJSON, nullable=False)
+    #: Categories explicitly reviewed. Empty for legacy records whose review was not recorded.
+    reviewed_steps: Mapped[list[str]] = mapped_column(GeoJSON, nullable=False, default=list, server_default="[]")
 
     #: Not in OpenStreetMap yet. Always `pending` on write; see `OsmSyncStatus`.
     osm_sync_status: Mapped[OsmSyncStatus] = mapped_column(

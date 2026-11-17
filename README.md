@@ -185,3 +185,17 @@ and serve a saved Overpass JSON extract at
 an Overpass outage. Include `osm3s.timestamp_osm_base` and the geometry
 returned by `out geom`. The app labels the snapshot date and tries the live
 lookup first. Refresh your OSM data before integrating draft geometry.
+
+
+### Partial drafts
+
+Use **Review this category later** when you have not checked the tees, green,
+fairway, bunkers or hazards. This advances the review without confirming an
+absence or sending a proposal decision. **Save current draft** saves the
+confirmed features and preserves earlier saved shapes that were not removed.
+
+Each saved hole carries `reviewed_steps`. Unreviewed categories remain explicit
+in the completion screen and survive reopening the draft. The migration gives
+legacy saves an empty review list, since their category review was not recorded.
+A draft with a green polygon alone does not assert that the hole has no tees,
+fairway or bunkers.

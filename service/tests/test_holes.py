@@ -504,3 +504,43 @@ def test_the_store_functions_answer_ok_none_for_a_missing_boundary(engine) -> No
         result = holes.latest_boundary(session, COURSE_ID)
     assert isinstance(result, Ok)
     assert result.value is None
+
+
+def test_partial_review_categories_survive_without_asserting_other_categories(client) -> None:
+    saved = client.post("/v1/holes", json=_hole(reviewed_steps=["green"]))
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["hole"]["reviewed_steps"] == ["green"]
+    read = client.get(f"/v1/holes/{COURSE_ID}").json()["holes"][0]
+    assert read["reviewed_steps"] == ["green"]
+    for invalid in (["green", "green"], ["not-a-review-step"]):
+        response = client.post("/v1/holes", json=_hole(reviewed_steps=invalid))
+        assert response.status_code == 422, response.text
+    # Clients predating review tracking never established full review.
+    assert client.post("/v1/holes", json=_hole()).json()["hole"]["reviewed_steps"] == []
+
+
+def test_review_migration_preserves_existing_geometry_and_leaves_review_unknown(tmp_path) -> None:
+    from pathlib import Path
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import text
+
+    database = tmp_path / "legacy.db"
+    config = Config()
+    config.set_main_option("script_location", str(Path(__file__).parents[1] / "migrations"))
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0004")
+    engine = create_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.execute(text("""
+            INSERT INTO saved_holes (
+                course_id, hole_number, playing_line, line_source, features
+            ) VALUES ('legacy', 1, '{"type":"LineString","coordinates":[[140,41],[140.1,41.1]]}', 'drawn', '[]')
+        """))
+    command.upgrade(config, "head")
+    with Session(engine) as session:
+        result = holes.latest_holes(session, "legacy")
+        assert isinstance(result, Ok)
+        assert result.value[0].reviewed_steps == ()
+        assert result.value[0].playing_line["coordinates"] == [[140, 41], [140.1, 41.1]]
+    engine.dispose()

@@ -777,6 +777,7 @@ class HoleBody(BaseModel):
     line_source: LineSource
     osm_hole_id: str | None = Field(default=None, max_length=64)
     features: list[SavedFeatureBody] = Field(default_factory=list, max_length=MAX_FEATURES_PER_HOLE)
+    reviewed_steps: list[Literal["tees", "green", "fairway", "bunkers", "hazards"]] = Field(default_factory=list, max_length=5)
 
     def to_input(self) -> holes.HoleInput:
         # `mode="json"` so what is stored is exactly the JSON the read path
@@ -789,6 +790,7 @@ class HoleBody(BaseModel):
             line_source=self.line_source,
             osm_hole_id=self.osm_hole_id,
             features=tuple(feature.model_dump(mode="json") for feature in self.features),
+            reviewed_steps=tuple(self.reviewed_steps),
         )
 
 
@@ -1261,6 +1263,7 @@ def _saved_hole(hole: holes.SavedHoleRecord) -> dict[str, Any]:
         "line_source": str(hole.line_source),
         "osm_hole_id": hole.osm_hole_id,
         "features": list(hole.features),
+        "reviewed_steps": list(hole.reviewed_steps),
         # Not in OpenStreetMap until the upload says so; see `models.OsmSyncStatus`.
         "osm_sync_status": str(hole.osm_sync_status),
         "osm_synced_at": hole.osm_synced_at.isoformat() if hole.osm_synced_at else None,

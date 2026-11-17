@@ -122,6 +122,7 @@ class HoleInput:
     line_source: LineSource
     osm_hole_id: str | None
     features: tuple[dict[str, Any], ...]
+    reviewed_steps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,7 @@ class SavedHoleRecord:
     osm_sync_status: OsmSyncStatus
     osm_synced_at: dt.datetime | None
     saved_at: dt.datetime
+    reviewed_steps: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -323,6 +325,10 @@ def _validate_hole(hole: HoleInput) -> Invalid | None:
             field_name="hole_number",
             detail={"hole_number": hole.hole_number},
         )
+    if len(hole.reviewed_steps) != len(set(hole.reviewed_steps)) or not set(hole.reviewed_steps) <= {
+        "tees", "green", "fairway", "bunkers", "hazards"
+    }:
+        return Invalid("Review categories must be distinct supported steps.", field_name="reviewed_steps")
     problem = line_problem(hole.playing_line)
     if problem is not None:
         return Invalid(
@@ -352,6 +358,7 @@ def _hole_from_row(row: SavedHole) -> SavedHoleRecord:
         line_source=LineSource(row.line_source),
         osm_hole_id=row.osm_hole_id,
         features=tuple(row.features),
+        reviewed_steps=tuple(row.reviewed_steps),
         osm_sync_status=OsmSyncStatus(row.osm_sync_status),
         osm_synced_at=as_utc(row.osm_synced_at) if row.osm_synced_at else None,
         saved_at=as_utc(row.saved_at),
@@ -388,6 +395,7 @@ def save_hole(session: Session, hole: HoleInput) -> Result[SavedHoleRecord]:
         line_source=hole.line_source,
         osm_hole_id=hole.osm_hole_id,
         features=list(hole.features),
+        reviewed_steps=list(hole.reviewed_steps),
     )
     try:
         session.add(row)

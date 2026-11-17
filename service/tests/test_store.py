@@ -455,6 +455,7 @@ def test_saved_holes_and_boundaries_hold_no_contributor_or_session_identifier() 
         "line_source",
         "osm_hole_id",
         "features",
+        "reviewed_steps",
         "osm_sync_status",
         "osm_synced_at",
         "saved_at",

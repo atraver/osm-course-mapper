@@ -1,3 +1,4 @@
+import type { StepId } from '../data/course';
 import type { LineString, MultiPolygon, Polygon } from 'geojson';
 import { DETECT_API_BASE, interpretFailure, readEnvelope, type DetectFailureReason } from './detect';
 
@@ -81,6 +82,7 @@ export interface SavedHole {
   lineSource: LineSourceWire;
   osmHoleId: string | null;
   features: SavedFeature[];
+  reviewedSteps?: StepId[];
   /** ISO-8601, set by the store. Absent on a hole not yet saved. */
   savedAt?: string;
   /** Set by the store: `pending` until the upload has sent the hole. */
@@ -140,6 +142,7 @@ export function holeToWire(hole: SavedHole) {
     line_source: hole.lineSource,
     osm_hole_id: hole.osmHoleId,
     features: hole.features.map(featureToWire),
+    ...(hole.reviewedSteps && { reviewed_steps: hole.reviewedSteps }),
   };
 }
 
@@ -204,6 +207,10 @@ export function holeFromWire(value: unknown): SavedHole | null {
     features: (Array.isArray(raw.features) ? raw.features : [])
       .map(featureFromWire)
       .filter((feature): feature is SavedFeature => feature !== null),
+    reviewedSteps: Array.isArray(raw.reviewed_steps)
+      ? [...new Set(raw.reviewed_steps.filter((step): step is StepId =>
+        typeof step === 'string' && ['tees', 'green', 'fairway', 'bunkers', 'hazards'].includes(step)))]
+      : undefined,
     savedAt: typeof raw.saved_at === 'string' ? raw.saved_at : undefined,
     osmSyncStatus: raw.osm_sync_status === 'synced' ? 'synced' : 'pending',
     osmSyncedAt: typeof raw.osm_synced_at === 'string' ? raw.osm_synced_at : null,
