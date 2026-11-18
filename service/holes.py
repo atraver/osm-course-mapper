@@ -301,8 +301,8 @@ def _feature_problem(index: int, feature: dict[str, Any]) -> Invalid | None:
             field_name="features",
             detail={"index": index, "member": "osm_id"},
         )
-    if proposal is not None:
-        acquired = (proposal.get("provenance") or {}).get("acquired")
+    acquired = (proposal.get("provenance") or {}).get("acquired") if proposal is not None else None
+    if acquired is not None:
         try:
             # Some imagery providers publish only the capture month.
             # Validate that month without adding a fictitious day to the record.

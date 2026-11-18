@@ -6,6 +6,8 @@ const tagsByKind = {
   green: ['golf', 'green'],
   fairway: ['golf', 'fairway'],
   bunker: ['golf', 'bunker'],
+  water: ['natural', 'water'],
+  trees: ['natural', 'wood'],
 } as const;
 
 function samePosition(a: Position, b: Position): boolean {
@@ -24,47 +26,65 @@ export function josmDraft(hole: SavedHole): string | null {
   let nextId = -1;
   const nodes: string[] = [];
   const ways: string[] = [];
-  const addWay = (points: Position[], closed: boolean, tags: Record<string, string>) => {
-    if (!points.every(validPosition) || points.length > 2000) return;
+  const relations: string[] = [];
+  const tagLines = (tags: Record<string, string>) =>
+    Object.entries(tags).map(([key, value]) => `    <tag k="${key}" v="${value}" />`);
+  const openWay = (points: Position[], closed: boolean): Position[] | null => {
+    if (points.length > 2000 || !points.every(validPosition)) return null;
     const open = closed && points.length > 0 && samePosition(points[0], points[points.length - 1])
       ? points.slice(0, -1)
       : points;
-    if (new Set(open.map(([lon, lat]) => `${lon},${lat}`)).size < (closed ? 3 : 2)) return;
-    const ids = open.map(([lon, lat]) => {
+    return new Set(open.map(([lon, lat]) => `${lon},${lat}`)).size >= (closed ? 3 : 2) ? open : null;
+  };
+  const addWay = (points: Position[], closed: boolean, tags: Record<string, string>) => {
+    const ids = points.map(([lon, lat]) => {
       const id = nextId--;
       nodes.push(`  <node id="${id}" lat="${lat}" lon="${lon}" />`);
       return id;
     });
     if (closed) ids.push(ids[0]);
+    const wayId = nextId--;
     ways.push([
-      `  <way id="${nextId--}">`,
+      `  <way id="${wayId}">`,
       ...ids.map(id => `    <nd ref="${id}" />`),
-      ...Object.entries(tags).map(([key, value]) => `    <tag k="${key}" v="${value}" />`),
+      ...tagLines(tags),
       '  </way>',
     ].join('\n'));
+    return wayId;
   };
 
   if (hole.lineSource === 'drawn' && !hole.osmHoleId && Number.isInteger(hole.holeNumber) && hole.holeNumber > 0) {
     const tags = { golf: 'hole', ref: String(hole.holeNumber) };
-    addWay(hole.playingLine.coordinates, false, tags);
+    const line = openWay(hole.playingLine.coordinates, false);
+    if (line) addWay(line, false, tags);
   }
   for (const feature of hole.features) {
     if (feature.origin === 'osm' || feature.osmAction !== 'create' || feature.osmId ||
-      feature.geometry.type !== 'Polygon' || feature.geometry.coordinates.length !== 1) continue;
-    switch (feature.kind) {
-      case 'tee':
-      case 'green':
-      case 'fairway':
-      case 'bunker': {
-        const [key, value] = tagsByKind[feature.kind];
-        const tags: Record<string, string> = { [key]: value };
-        if (feature.osmTags.source === 'GSImaps/seamlessphoto') tags.source = feature.osmTags.source;
-        addWay(feature.geometry.coordinates[0], true, tags);
-      }
+        feature.geometry.type !== 'Polygon') continue;
+    const kind = feature.kind;
+    if (kind === 'waste_area' || kind === 'native_area' || kind === 'other') continue;
+    const rings = feature.geometry.coordinates.map(ring => openWay(ring, true));
+    if (rings.length === 0 || rings.some(ring => ring === null)) continue;
+    const [key, value] = tagsByKind[kind];
+    const tags: Record<string, string> = { [key]: value };
+    if (feature.osmTags.source === 'GSImaps/seamlessphoto') tags.source = feature.osmTags.source;
+    if (rings.length === 1) {
+      addWay(rings[0]!, true, tags);
+    } else {
+      const members = rings.map((ring, index) => {
+        const wayId = addWay(ring!, true, {});
+        return `    <member type="way" ref="${wayId}" role="${index === 0 ? 'outer' : 'inner'}" />`;
+      });
+      relations.push([
+        `  <relation id="${nextId--}">`,
+        ...members,
+        ...tagLines({ type: 'multipolygon', ...tags }),
+        '  </relation>',
+      ].join('\n'));
     }
   }
   if (ways.length === 0) return null;
   return ['<?xml version="1.0" encoding="UTF-8"?>',
     '<osm version="0.6" generator="OSM Course Mapper" upload="never" download="never">',
-    ...nodes, ...ways, '</osm>', ''].join('\n');
+    ...nodes, ...ways, ...relations, '</osm>', ''].join('\n');
 }

@@ -25,8 +25,9 @@ import { HoverButton } from '../components/HoverButton';
 import { BaseMap, type ImageryStatus } from '../map/BaseMap';
 import { courseImagery, corridorOverlay, type CorridorOverlay } from '../map/imagerySources';
 import { useShapeEditor } from '../map/useShapeEditor';
+import { POINT_TRACE_ENABLED, TRACE_TOLERANCES } from '../api/trace';
 import type { DetectionImagery, Proposal } from '../api/detect';
-import { LOCATE_CLOSE_ENOUGH, type MapBounds, type Mapper } from '../state/useMapper';
+import { greenCandidate, LOCATE_CLOSE_ENOUGH, type MapBounds, type Mapper } from '../state/useMapper';
 
 const FEATURE_SOURCE = 'review-features';
 const FILL_LAYER = 'review-features-fill';
@@ -686,7 +687,7 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
   const interaction = state.interaction;
   const drawingLine = isLocate && !locateDone && lineSource === 'drawn' && !detecting;
   const placing =
-    !imageryFailed && (interaction.kind === 'place' || interaction.kind === 'pick' || drawingLine);
+    !imageryFailed && (interaction.kind === 'place' || interaction.kind === 'pick' || interaction.kind === 'trace-point' || drawingLine);
 
   const teeSetName =
     course?.tees.find((tee) => tee.color === state.teeSet)?.name ?? course?.tees[0]?.name ?? 'the card';
@@ -868,6 +869,11 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
   const newShape =
     interaction.kind === 'new' ? state.shapes.find((shape) => shape.id === interaction.shapeId) ?? null : null;
 
+  const tracePreview = interaction.kind === 'new' ? interaction.trace : undefined;
+  const tracing = interaction.kind === 'trace-point' || interaction.kind === 'trace-working';
+  const canTrace = POINT_TRACE_ENABLED && course?.country === 'JP' && !imageryFailed &&
+    (stepKind !== 'green' || greenCandidate(state)?.origin !== 'osm');
+
   const stepCounter = isLocate
     ? 'first, the line of the hole'
     : allDone
@@ -885,6 +891,14 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
             : `Click the map where the ${SHAPE_NOUN[interaction.shape]} is.`}
         </MapPrompt>
       );
+    } else if (interaction.kind === 'trace-point') {
+      prompt = (
+        <MapPrompt onCancel={actions.cancelInteraction}>
+          Click inside the {SHAPE_NOUN[interaction.target.shape]}, away from the edge.
+        </MapPrompt>
+      );
+    } else if (interaction.kind === 'trace-working') {
+      prompt = <MapPrompt onCancel={actions.cancelInteraction}>Tracing the imagery…</MapPrompt>;
     } else if (interaction.kind === 'pick') {
       prompt =
         interaction.purpose === 'tee' ? (
@@ -1353,20 +1367,70 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
             <div style={{ ...EYEBROW, color: 'var(--mint-400)', marginBottom: 10 }}>
               {newShape.origin === 'drawn' ? `Your new ${SHAPE_NOUN[newShape.kind]}` : `That ${SHAPE_NOUN[newShape.kind]}`}
             </div>
-            <h3 style={{ ...H3, fontSize: 20 }}>Pull the dots until it fits.</h3>
+            <h3 style={{ ...H3, fontSize: 20 }}>{tracePreview ? 'Check the traced outline' : 'Pull the dots until it fits.'}</h3>
             <p style={NOTE}>
-              {newShape.origin === 'drawn'
+              {tracePreview ? 'Adjust edge tolerance first, then drag vertices to fine-tune the outline.' : newShape.origin === 'drawn'
                 ? `We dropped a rough ${SHAPE_NOUN[newShape.kind]} where you clicked. Drag its corners to match what is on the ground.`
                 : `Drag its corners to match what is on the ground, then save it.`}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <Button size="lg" variant="accent" fullWidth onClick={actions.confirmNew}>
+              {tracePreview && (
+                <>
+                  {newShape.kind === 'hazard' && (
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      Hazard type
+                      <select value={newShape.hazardType ?? ''} onChange={event => {
+                        const type = HAZARD_TYPES.find(entry => entry.type === event.target.value)?.type;
+                        if (type) actions.setHazardType(newShape.id, type);
+                      }}>
+                        <option value="" disabled>Choose type</option>
+                        {HAZARD_TYPES.map(entry => <option key={entry.type} value={entry.type}>{entry.label}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    Edge tolerance
+                    <select
+                      value={tracePreview.tolerance}
+                      onChange={event => {
+                        const tolerance = TRACE_TOLERANCES.find(value => value === event.target.value);
+                        if (tolerance) actions.setTraceTolerance(tolerance);
+                      }}
+                    >
+                      {TRACE_TOLERANCES.map(value => (
+                        <option key={value} value={value} disabled={!tracePreview.options.some(option => option.tolerance === value)}>
+                          {{ tight: 'Tighter', balanced: 'Balanced', wide: 'Wider' }[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <HoverButton onClick={actions.retryTrace} style={{ ...GHOST_BUTTON, height: 40 }} hoverStyle={GHOST_HOVER}>
+                    Choose another point
+                  </HoverButton>
+                </>
+              )}
+              <Button size="lg" variant="accent" fullWidth onClick={actions.confirmNew}
+                disabled={!!tracePreview && newShape.kind === 'hazard' && !newShape.hazardType}>
                 Save this {SHAPE_NOUN[newShape.kind]}
               </Button>
               <HoverButton onClick={actions.discardNew} style={{ ...GHOST_BUTTON, height: 40 }} hoverStyle={GHOST_HOVER}>
                 Remove it
               </HoverButton>
             </div>
+          </div>
+        )}
+
+        {!isLocate && tracing && (
+          <div style={RAIL_CARD}>
+            <h3 style={H3}>Trace {SHAPE_NOUN[interaction.target.shape]} from imagery</h3>
+            <p style={NOTE} role="status">
+              {interaction.kind === 'trace-working'
+                ? 'Finding the edges in the GSI imagery…'
+                : 'Click inside the feature to preview its outline.'}
+            </p>
+            <HoverButton onClick={actions.cancelInteraction} style={{ ...GHOST_BUTTON, height: 40 }} hoverStyle={GHOST_HOVER}>
+              Cancel trace
+            </HoverButton>
           </div>
         )}
 
@@ -1526,6 +1590,16 @@ export function ReviewScreen({ mapper, now }: { mapper: Mapper; now?: Date }) {
                 {question.accept}
               </Button>
               <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+                {canTrace && (
+                  <HoverButton
+                    onClick={actions.startTrace}
+                    disabled={interaction.kind !== 'none'}
+                    style={{ ...GHOST_BUTTON, flex: '1 1 100%', height: 44, fontSize: 14 }}
+                    hoverStyle={GHOST_HOVER}
+                  >
+                    Trace outline from imagery
+                  </HoverButton>
+                )}
                 {question.actions.map((action) => (
                   <HoverButton
                     key={action.id}

@@ -92,7 +92,7 @@ class Segmenter:
         tensor[0, :, : self.size[1], : self.size[0]] = norm.transpose(2, 0, 1)
         self.embeddings = self.encoder.run(None, {"pixel_values": tensor})
 
-    def mask(self, shape, positive, negative):
+    def logits(self, shape, positive, negative):
         height, width = shape
         points = np.array(positive + negative, dtype=np.float32)
         if (
@@ -119,23 +119,33 @@ class Segmenter:
             logits = cv2.resize(masks[0, 0, idx], (1024, 1024))[
                 : self.size[1], : self.size[0]
             ]
-            mask = (cv2.resize(logits, (width, height)) > 0).astype(np.uint8)
-            _, parts = cv2.connectedComponents(mask)
-            component = parts[positive[0][1], positive[0][0]]
-            if not component or any(parts[y, x] != component for x, y in positive):
-                continue
-            selected = (parts == component).astype(np.uint8)
-            if any(selected[y, x] for x, y in negative):
-                continue
-            if (
-                selected[0].any()
-                or selected[-1].any()
-                or selected[:, 0].any()
-                or selected[:, -1].any()
-            ):
-                continue
-            return selected, float(scores[0, 0, idx])
+            yield cv2.resize(logits, (width, height)), float(scores[0, 0, idx])
+
+    def mask(self, shape, positive, negative):
+        for logits, score in self.logits(shape, positive, negative):
+            selected = prompt_component(logits, positive, negative)
+            if selected is not None:
+                return selected, score
         return None, None
+
+
+def prompt_component(logits, positive, negative=(), threshold=0):
+    mask = (logits > threshold).astype(np.uint8)
+    _, parts = cv2.connectedComponents(mask)
+    component = parts[positive[0][1], positive[0][0]]
+    if not component or any(parts[y, x] != component for x, y in positive):
+        return None
+    selected = (parts == component).astype(np.uint8)
+    if any(selected[y, x] for x, y in negative):
+        return None
+    if (
+        selected[0].any()
+        or selected[-1].any()
+        or selected[:, 0].any()
+        or selected[:, -1].any()
+    ):
+        return None
+    return selected
 
 
 def snap_guide(image, guide, band):
@@ -176,7 +186,7 @@ def snap_guide(image, guide, band):
     return (labels & 1).astype(np.uint8)
 
 
-def polygon(mask, offset, mosaic):
+def polygon(mask, offset, coordinate_at):
     smooth = (cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.35) >= 0.5).astype(
         np.uint8
     )
@@ -190,7 +200,7 @@ def polygon(mask, offset, mosaic):
 
     def ring(idx):
         return [
-            mosaic.lonlat(x + offset[0], y + offset[1])
+            coordinate_at(x + offset[0], y + offset[1])
             for x, y in contours[idx].reshape(-1, 2)
         ]
 
@@ -206,7 +216,7 @@ def polygon(mask, offset, mosaic):
     # Simplify in pixel space to give the same tolerance in both axes.
     def simplified(idx):
         vertices = cv2.approxPolyDP(contours[idx], 1.1, True).reshape(-1, 2)
-        return [mosaic.lonlat(x + offset[0], y + offset[1]) for x, y in vertices]
+        return [coordinate_at(x + offset[0], y + offset[1]) for x, y in vertices]
 
     small_holes = [
         simplified(i)
@@ -250,7 +260,7 @@ def propose(mosaic, windows, model, boundary=None):
                 neg = [(u - x, v - y) for u, v in prompt.get("negative", [])]
                 mask, score = model.mask((h, w), pos, neg)
                 method = MODEL
-            geom = None if mask is None else polygon(mask, (x, y), mosaic)
+            geom = None if mask is None else polygon(mask, (x, y), mosaic.lonlat)
             if geom is not None and boundary is not None:
                 # Screen obviously implausible point-prompt masks before review.
                 lat = math.radians(geom.centroid.y)

@@ -27,7 +27,7 @@ class ImageryTests(unittest.TestCase):
         mask = np.zeros((65, 65), np.uint8)
         mask[5:55, 5:57] = 1
         mask[24:36, 24:36] = 0
-        area = polygon(mask, (0, 0), self.m)
+        area = polygon(mask, (0, 0), self.m.lonlat)
         self.assertTrue(area.is_valid)
         self.assertEqual(len(area.interiors), 1)
 

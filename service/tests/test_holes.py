@@ -556,3 +556,12 @@ def test_month_precision_and_unscored_outlines_survive_save(client):
     assert saved["features"][0]["proposal"] == feature["proposal"]
     feature["proposal"]["provenance"]["acquired"] = "2017-13"
     assert client.post("/v1/holes", json=_hole(features=[feature])).status_code == 422
+
+
+def test_trace_provenance_without_an_acquisition_date_survives_save(client):
+    feature = _proposed_green()
+    feature["proposal"]["provenance"]["acquired"] = None
+    response = client.post("/v1/holes", json=_hole(features=[feature]))
+    assert response.status_code == 200
+    stored = client.get(f"/v1/holes/{COURSE_ID}?hole=7").json()["holes"][0]
+    assert stored["features"][0]["proposal"] == feature["proposal"]

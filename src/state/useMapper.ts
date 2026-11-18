@@ -18,6 +18,7 @@ import {
   type SavedFeature,
   type SavedHole,
 } from '../api/holes';
+import { requestTrace, type TraceOutline } from '../api/trace';
 import type { OsmHole, OsmHoleFeature, OsmLookup } from '../api/overpass';
 import {
   SHAPE_NOUN,
@@ -190,6 +191,17 @@ export interface HoleShape {
  * accept pressed with a half-dragged outline would confirm a shape nobody has
  * finished drawing.
  */
+interface TraceTarget {
+  shape: ShapeKind;
+  forTee: string | null;
+  replaceId: string | null;
+}
+
+interface TracePreview extends TraceTarget {
+  options: TraceOutline[];
+  tolerance: TraceOutline['tolerance'];
+}
+
 export type Interaction =
   | { kind: 'none' }
   /** "Edges look off": drag handles on these outlines. */
@@ -199,7 +211,8 @@ export type Interaction =
   /** Click one of the shapes on the map: the box a tee plays from, or the one that is not sand. */
   | { kind: 'pick'; purpose: 'tee' | 'remove' }
   /** A shape just dropped or picked, being pulled into place before it is kept. */
-  | { kind: 'new'; shapeId: string };
+  | { kind: 'new'; shapeId: string; trace?: TracePreview }
+  | { kind: 'trace-point' | 'trace-working'; target: TraceTarget };
 
 const NO_INTERACTION: Interaction = { kind: 'none' };
 
@@ -1313,6 +1326,15 @@ export function useMapper() {
    * is no longer the request anyone is waiting for.
    */
   const detectRun = useRef<AbortController | null>(null);
+  const traceRun = useRef<AbortController | null>(null);
+  const traceWorking = state.interaction.kind === 'trace-working';
+  useEffect(() => {
+    if (!traceWorking) return;
+    return () => {
+      traceRun.current?.abort();
+      traceRun.current = null;
+    };
+  }, [traceWorking]);
   /** The hole save in flight, dropped the same way when the contributor leaves. */
   const saveRun = useRef<AbortController | null>(null);
 
@@ -1600,17 +1622,18 @@ export function useMapper() {
   const cancelInteraction = useCallback(() => {
     const s = state;
     if (s.interaction.kind === 'none') return;
+    if (s.interaction.kind === 'trace-working') traceRun.current?.abort();
     /* A shape still being pulled into place when the contributor backs out was
      * never kept. A picked proposal goes back to waiting; a drawn one goes. */
     if (s.interaction.kind === 'new') {
       const id = s.interaction.shapeId;
       const shape = s.shapes.find((candidate) => candidate.id === id);
-      if (shape?.origin === 'drawn') {
+      if (shape?.origin === 'drawn' || (shape && s.interaction.trace)) {
         patch({ ...withoutShape(s, shape.id), interaction: NO_INTERACTION });
         return;
       }
     }
-    patch({ interaction: NO_INTERACTION });
+    patch({ interaction: NO_INTERACTION, lastAction: '' });
   }, [state, patch, withoutShape]);
 
   /** Keep the shape just dropped or picked. On the green step that is the answer. */
@@ -1620,20 +1643,28 @@ export function useMapper() {
     const id = s.interaction.shapeId;
     const shape = s.shapes.find((candidate) => candidate.id === id);
     if (!shape) return;
-    const step = stepAt(s);
+    const trace = s.interaction.trace;
+    if (trace && shape.kind === 'hazard' && !shape.hazardType) return;
+    const withoutOld = trace?.replaceId ? withoutShape(s, trace.replaceId) : {};
+    const updated = { ...s, ...withoutOld };
+    const step = stepAt(updated);
     if (step?.id === 'green' && shape.kind === 'green') {
-      patch({ ...confirming(s, [id]), ...nextStep(s, 'That is the green.') });
+      patch({ ...withoutOld, ...confirming(updated, [id]), ...nextStep(updated, 'That is the green.') });
       return;
     }
-    const sets = teeSetsFrom(s, id);
+    const teeBoxes = trace?.forTee ? { ...updated.teeBoxes, [trace.forTee]: id } : updated.teeBoxes;
+    const sets = teeSetsFrom({ ...updated, teeBoxes }, id);
     patch({
+      ...withoutOld,
+      ...(trace ? confirming(updated, [id]) : {}),
+      teeBoxes,
       interaction: NO_INTERACTION,
       lastAction:
         shape.kind === 'tee' && sets.length > 0
-          ? `Drew a box for the ${sets.map((tee) => tee.name.toLowerCase()).join(' + ')} tee.`
-          : `Added the ${SHAPE_NOUN[shape.kind]} you spotted — that one was on us.`,
+          ? `${trace ? 'Traced' : 'Drew'} a box for the ${sets.map((tee) => tee.name.toLowerCase()).join(' + ')} tee.`
+          : trace ? `Added the ${SHAPE_NOUN[shape.kind]}.` : `Added the ${SHAPE_NOUN[shape.kind]} you spotted — that one was on us.`,
     });
-  }, [state, patch, confirming]);
+  }, [state, patch, confirming, withoutShape]);
 
   /** Throw away the shape just dropped or picked. */
   const discardNew = useCallback(() => {
@@ -1737,6 +1768,83 @@ export function useMapper() {
     };
   };
 
+  const startTrace = useCallback(() => {
+    patch(s => {
+      const step = stepAt(s);
+      if (!step || isBlocked(s) || s.mode === 'locate' || s.interaction.kind !== 'none' || s.course?.country !== 'JP') return {};
+      const existingGreen = step.kind === 'green' ? greenCandidate(s) : null;
+      if (existingGreen?.origin === 'osm') return {};
+      const target = {
+        shape: step.kind,
+        forTee: step.kind === 'tee' && teesByCard(s) ? teeSetsOf(s)[s.teeIndex]?.key ?? null : null,
+        replaceId: existingGreen?.id ?? null,
+      };
+      return { interaction: { kind: 'trace-point', target }, lastAction: '' };
+    });
+  }, [patch]);
+
+  const tracePoint = useCallback((target: TraceTarget, point: LngLat) => {
+    if (traceRun.current) return;
+    const controller = new AbortController();
+    traceRun.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 55_000);
+    const working: Interaction = { kind: 'trace-working', target };
+    patch({ interaction: working, lastAction: '' });
+    void requestTrace(target.shape, point, controller.signal).then(result => {
+      patch(s => {
+        if (s.interaction !== working) return {};
+        const outline = result.options.find(option => option.tolerance === 'balanced');
+        if (!outline) return { interaction: { kind: 'trace-point', target }, lastAction: 'No closed outline found.' };
+        const [ring, ...inner] = outline.rings;
+        const shape: HoleShape = {
+          id: `traced-${s.shapeSeq + 1}`, kind: target.shape, ring, inner, original: ring,
+          origin: 'proposed', proposal: null,
+          savedSource: result.provenance.source,
+          savedProposal: { confidence: null, provenance: result.provenance },
+          edited: false, confirmed: false, removed: false, hazardType: null,
+        };
+        return {
+          shapes: s.shapes.concat(shape),
+          shapeSeq: s.shapeSeq + 1,
+          interaction: { kind: 'new', shapeId: shape.id, trace: { ...target, options: result.options, tolerance: outline.tolerance } },
+        };
+      });
+    }).catch(error => {
+      patch(s => s.interaction === working ? {
+        interaction: { kind: 'trace-point', target },
+        lastAction: controller.signal.aborted ? 'Tracing timed out. Try another point.' : String(error.message ?? error),
+      } : {});
+    }).finally(() => {
+      clearTimeout(timeout);
+      if (traceRun.current === controller) traceRun.current = null;
+    });
+  }, [patch]);
+
+  const setTraceTolerance = useCallback((tolerance: TraceOutline['tolerance']) => {
+    patch(s => {
+      const { interaction } = s;
+      if (interaction.kind !== 'new' || !interaction.trace || tolerance === interaction.trace.tolerance) return {};
+      const outline = interaction.trace.options.find(option => option.tolerance === tolerance);
+      if (!outline) return {};
+      const [ring, ...inner] = outline.rings;
+      return {
+        interaction: { ...interaction, trace: { ...interaction.trace, tolerance } },
+        shapes: s.shapes.map(shape => shape.id === interaction.shapeId ? { ...shape, ring, inner, original: ring, edited: false } : shape),
+      };
+    });
+  }, [patch]);
+
+  const retryTrace = useCallback(() => {
+    const { interaction } = state;
+    if (interaction.kind !== 'new' || !interaction.trace) return;
+    const { shape, forTee, replaceId } = interaction.trace;
+    patch({
+      ...withoutShape(state, interaction.shapeId),
+      interaction: { kind: 'trace-point', target: { shape, forTee, replaceId } },
+      lastAction: '',
+    });
+  }, [state, patch, withoutShape]);
+
   /**
    * A click on the imagery, already a WGS84 coordinate — `BaseMap` unprojects it,
    * so nothing here converts from screen space (R7).
@@ -1758,6 +1866,10 @@ export function useMapper() {
       }
 
       const interaction = s.interaction;
+      if (interaction.kind === 'trace-point') {
+        tracePoint(interaction.target, position);
+        return;
+      }
       if (interaction.kind === 'pick') {
         if (interaction.purpose === 'tee') {
           const tee = teeSetsOf(s)[s.teeIndex];
@@ -1813,7 +1925,7 @@ export function useMapper() {
         });
       }
     },
-    [state, patch, withoutShape],
+    [state, patch, withoutShape, tracePoint],
   );
 
   /** One outline, reshaped on the map. */
@@ -2163,6 +2275,9 @@ export function useMapper() {
       missing,
       runAction,
       startPlace,
+      startTrace,
+      retryTrace,
+      setTraceTolerance,
       startPick,
       startEdit,
       finishEdit,

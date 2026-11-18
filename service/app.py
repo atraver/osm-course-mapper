@@ -721,13 +721,17 @@ class SavedTeeSetBody(BaseModel):
     yards: float | None = Field(default=None, ge=MIN_TEE_YARDS, le=MAX_TEE_YARDS)
 
 
+class SavedProvenanceBody(ProvenanceBody):
+    acquired: str | None
+
+
 class ProposalBody(BaseModel):
     """Saved outlines may also come from edge fitting, which has no confidence score."""
 
     model_config = ConfigDict(extra="forbid")
 
     confidence: float | None = Field(ge=0.0, le=1.0)
-    provenance: ProvenanceBody
+    provenance: SavedProvenanceBody
 
 
 class SavedFeatureBody(BaseModel):

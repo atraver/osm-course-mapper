@@ -26,3 +26,29 @@ The runner fetches the imagery and two pinned ONNX files, builds the Docker imag
 The prompts file records its tile grid and uses pixel coordinates measured from the mosaic’s upper-left pixel centre. Each window has `crop: [left, top, width, height]` and a list of prompts. Each prompt has a unique ID, kind, optional hole association (null if unknown), and positive points with optional negative points, or an edge guide. A networkless container can rerun that file deterministically for the same inputs. Raw mask scores are model estimates of overlap and can slightly exceed one. They do not measure yardage accuracy.
 
 Sources: [GSI imagery catalogue](https://maps.gsi.go.jp/development/ichiran.html), [GSI capture-period guide](https://maps.gsi.go.jp/legend/seamlessphoto.pdf), [SlimSAM model](https://huggingface.co/Xenova/slimsam-77-uniform), [SlimSAM research](https://github.com/czg1225/SlimSAM).
+
+## Click-to-trace in Course Mapper
+
+Run `trace_server.py` in the imagery-review image on a private network with the
+same checksum-verified weights mounted read-only at `/model`. Override the image
+entrypoint with `python /tool/trace_server.py`. The service listens on port
+8081. Route only `POST /v1/trace` from the mapper's origin to this service and
+allow up to 50 seconds for cold CPU inference. Keep the tracer off public
+ingress and give it 4 GiB of memory. Build the web app with
+`VITE_POINT_TRACE=true` to enable the button for GSI imagery.
+
+In the hole review, choose **Trace outline from imagery** and click inside the
+visible feature. Try **Tighter**, **Balanced** or **Wider** before moving
+vertices. The options adjust the threshold on one image mask and require a
+closed outline around the click. **Choose another point** starts a fresh trace.
+Select the hazard type before keeping a hazard. Use **Save current draft**
+to store the hole, then **Download JOSM review draft** for reconciliation.
+Large or faint features can exceed the trace window or need manual editing.
+
+The browser assembles native zoom-18 tiles from GSI and sends a JPEG crop to
+the local point service. The server returns crop-space rings and the browser
+projects them to longitude and latitude. It retains the GSI source and model
+revision in the saved feature record. If the exact imagery acquisition date is
+unavailable, the saved date is null. A polygon is imagery evidence for review
+in JOSM. Water and wood exports describe visible land cover. Designating a
+penalty area requires evidence of its markings.

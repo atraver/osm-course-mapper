@@ -56,6 +56,12 @@ vi.mock('../api/detect', async (importOriginal) => {
   return { ...actual, requestProposals: detection.request };
 });
 
+const trace = vi.hoisted(() => ({ request: vi.fn() }));
+vi.mock('../api/trace', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../api/trace')>(),
+  requestTrace: trace.request,
+}));
+
 import { STEPS, type StepId } from '../data/course';
 import { buildCourseSession, teeSetsFor } from './courseSession';
 import {
@@ -2494,4 +2500,34 @@ describe('framing the map', () => {
     expect(n).toBeGreaterThan(PEBBLE_GREEN[1]);
     expect(e - w).toBeLessThan(empty.mapBounds![2] - empty.mapBounds![0]);
   });
+});
+
+
+it('keeps only the traced green outline chosen in the tolerance preview', async () => {
+  const hook = renderHook(() => useMapper());
+  act(() => hook.result.current.actions.openCourse({ ...SESSION, country: 'JP' }, { status: 'absent' }));
+  act(() => hook.result.current.actions.openHole(0));
+  for (const point of PEBBLE_LINE) act(() => hook.result.current.actions.onMapClick(point));
+  act(() => hook.result.current.actions.confirmLine());
+  act(() => hook.result.current.actions.confirmLocate());
+  acceptUntil(hook, 'green');
+  const balanced = squareAround(PEBBLE_GREEN);
+  const wide = squareAround(PEBBLE_GREEN, 0.00009);
+  trace.request.mockResolvedValue({
+    options: [
+      { tolerance: 'balanced', rings: [openRing(balanced.coordinates[0])] },
+      { tolerance: 'wide', rings: [openRing(wide.coordinates[0])] },
+    ],
+    provenance: { acquired: null, gsdMeters: 0.45, source: 'GSImaps/seamlessphoto', modelId: 'slimsam', itemId: 'crop' },
+  });
+  act(() => hook.result.current.actions.startTrace());
+  await act(async () => hook.result.current.actions.onMapClick(PEBBLE_GREEN));
+  expect(hook.result.current.state.interaction.kind).toBe('new');
+  expect(holeToSave(hook.result.current.state)?.features).toHaveLength(0);
+  act(() => hook.result.current.actions.setTraceTolerance('wide'));
+  act(() => hook.result.current.actions.confirmNew());
+  const [green] = holeToSave(hook.result.current.state)!.features;
+  expect(green.geometry).toEqual(wide);
+  expect(green.origin).toBe('proposed');
+  expect(green.proposal?.provenance.acquired).toBeNull();
 });

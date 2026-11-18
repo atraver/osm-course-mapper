@@ -58,7 +58,7 @@ export interface SavedFeature {
   proposal: {
     confidence: number | null;
     provenance: {
-      acquired: string;
+      acquired: string | null;
       gsdMeters: number;
       source: string;
       modelId: string;
@@ -180,7 +180,7 @@ function featureFromWire(value: unknown): SavedFeature | null {
         ? {
             confidence: typeof proposal.confidence === 'number' ? proposal.confidence : null,
             provenance: {
-              acquired: String(provenance.acquired ?? ''),
+              acquired: typeof provenance.acquired === 'string' ? provenance.acquired : null,
               gsdMeters: Number(provenance.gsd_meters ?? 0),
               source: String(provenance.source ?? ''),
               modelId: String(provenance.model_id ?? ''),

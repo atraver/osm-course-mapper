@@ -45,3 +45,22 @@ it('exports saved model-assisted outlines into the upload-blocked review layer',
   expect(xml.querySelectorAll('way')).toHaveLength(1);
   expect(xml.querySelector('tag[k="golf"]')?.getAttribute('v')).toBe('green');
 });
+
+it('keeps inner rings and exports water without assigning a penalty area', () => {
+  const water: SavedFeature = {
+    ...tee, kind: 'water',
+    geometry: { type: 'Polygon', coordinates: [
+      [[140, 41], [141, 41], [141, 42], [140, 42], [140, 41]],
+      [[140.1, 41.1], [140.2, 41.1], [140.2, 41.2], [140.1, 41.1]],
+    ] },
+    osmTags: { golf: 'water_hazard', source: 'GSImaps/seamlessphoto' },
+  };
+  const xml = new DOMParser().parseFromString(josmDraft({ ...hole, lineSource: 'osm', features: [water] })!, 'text/xml');
+  const relation = xml.querySelector('relation')!;
+  expect(relation.querySelector('tag[k="type"]')?.getAttribute('v')).toBe('multipolygon');
+  expect(relation.querySelector('tag[k="natural"]')?.getAttribute('v')).toBe('water');
+  expect(relation.querySelector('tag[k="golf"]')).toBeNull();
+  const members = [...relation.querySelectorAll('member')];
+  expect(members.map(member => member.getAttribute('role'))).toEqual(['outer', 'inner']);
+  expect(members.every(member => !!xml.querySelector(`way[id="${member.getAttribute('ref')}"]`))).toBe(true);
+});
